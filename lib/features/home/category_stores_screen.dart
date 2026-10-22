@@ -1,4 +1,4 @@
-export 'category_stores_legacy.dart' show StoreProductsScreen;
+export 'store_products_screen.dart' show StoreProductsScreen;
 
 import 'package:bringo/features/home/category_stores_listing_screen.dart';
 
