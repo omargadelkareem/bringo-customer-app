@@ -626,7 +626,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final normalized = _normalize(name);
 
     String? storeType;
-    if (id == 'restaurants' || id == 'restaurant' || normalized.contains('مطعم')) {
+    if (id == 'restaurants' ||
+        id == 'restaurant' ||
+        normalized.contains('مطعم') ||
+        normalized.contains('مطاعم')) {
       storeType = 'restaurant';
     } else if (id == 'supermarket' || id == 'grocery_store' || id == 'grocery' ||
         normalized.contains('سوبر ماركت') || normalized.contains('سوبرماركت')) {
