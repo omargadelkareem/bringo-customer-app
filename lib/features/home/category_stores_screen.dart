@@ -76,16 +76,9 @@ class _CategoryStoresScreenState extends State<CategoryStoresScreen> {
             ? store['id'].toString()
             : key.toString();
 
-        final requestedType = widget.storeType.trim().toLowerCase();
         final type = store['type']?.toString().trim().toLowerCase() ?? '';
-        final category = store['category']?.toString().trim().toLowerCase() ?? '';
-        final categoryId = store['categoryId']?.toString().trim().toLowerCase() ?? '';
-        final values = {type, category, categoryId};
-        const restaurantAliases = {'restaurant', 'restaurants', 'food', 'foods', 'مطعم', 'مطاعم'};
-        final matchesType = requestedType == 'restaurant'
-            ? values.any(restaurantAliases.contains)
-            : values.contains(requestedType);
-        if (!matchesType) return;
+
+        if (type != widget.storeType.toLowerCase()) return;
 
         if (store['isActive'] == false) return;
 
