@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:bringo/core/constant/app_colors.dart';
+import 'package:bringo/core/routing/app_routes.dart';
 import 'package:bringo/core/services/adress_services.dart';
 import 'package:bringo/core/services/location_service.dart';
 import 'package:bringo/features/cart/cart_manager.dart';
@@ -8,6 +9,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:go_router/go_router.dart';
 
 class CartScreen extends StatefulWidget {
   final List<Map<String, dynamic>> cartItems;
@@ -98,9 +100,15 @@ class _CartScreenState extends State<CartScreen> {
   int _count(List<Map<String, dynamic>> items) => items.fold(0, (sum, item) => sum + (int.tryParse(item['quantity']?.toString() ?? '1') ?? 1));
 
   void _message(String text) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(text, textAlign: TextAlign.right), backgroundColor: AppColors.primary));
+  }
+
+  void _returnToShopping() {
+    if (!mounted) return;
+    context.go(AppRoutes.home);
   }
 
   Future<void> _placeOrder(List<Map<String, dynamic>> items) async {
@@ -162,16 +170,22 @@ class _CartScreenState extends State<CartScreen> {
         'driverId': '', 'driverKey': '', 'driverName': '', 'driverPhone': '', 'estimatedDeliveryMinutes': 25,
         'createdAt': ServerValue.timestamp, 'updatedAt': ServerValue.timestamp,
       });
+
+      if (!mounted) return;
       CartManager.clear();
       if (!mounted) return;
-      Navigator.pop(context);
-      await showDialog(context: context, builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22.r)),
-        title: const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 58),
-        content: const Text('تم إرسال طلبك بنجاح', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('تمام'))],
-      ));
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22.r)),
+          title: const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 58),
+          content: const Text('تم إرسال طلبك بنجاح', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('تمام'))],
+        ),
+      );
     } catch (_) {
       _message('حصل خطأ أثناء إرسال الطلب');
     } finally {
@@ -192,7 +206,7 @@ class _CartScreenState extends State<CartScreen> {
             backgroundColor: const Color(0xFFF7F8F8),
             appBar: AppBar(
               backgroundColor: Colors.white, surfaceTintColor: Colors.white, elevation: 0,
-              leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20), onPressed: () => Navigator.pop(context)),
+              leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20), onPressed: _returnToShopping),
               title: const Text('سلة المشتريات', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
               centerTitle: true,
               actions: items.isEmpty ? null : [TextButton(onPressed: CartManager.clear, child: const Text('إفراغ', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w800))), SizedBox(width: 6.w)],
@@ -259,7 +273,7 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _qty(IconData icon, VoidCallback onTap) => InkWell(onTap: onTap, borderRadius: BorderRadius.circular(9.r), child: Container(width: 30.w, height: 30.w, decoration: BoxDecoration(color: const Color(0xFFF1F5F4), borderRadius: BorderRadius.circular(9.r)), child: Icon(icon, size: 18.sp, color: AppColors.primary)));
 
-  Widget _addMore() => InkWell(onTap: () => Navigator.pop(context), borderRadius: BorderRadius.circular(12.r), child: Container(padding: EdgeInsets.symmetric(vertical: 13.h), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12.r), border: Border.all(color: AppColors.primary.withOpacity(.28))), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.add_rounded, color: AppColors.primary), SizedBox(width: 5.w), Text('إضافة منتجات أخرى', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w900, color: AppColors.primary))])));
+  Widget _addMore() => InkWell(onTap: _returnToShopping, borderRadius: BorderRadius.circular(12.r), child: Container(padding: EdgeInsets.symmetric(vertical: 13.h), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12.r), border: Border.all(color: AppColors.primary.withOpacity(.28))), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.add_rounded, color: AppColors.primary), SizedBox(width: 5.w), Text('إضافة منتجات أخرى', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w900, color: AppColors.primary))])));
 
   Widget _summary(double subtotal) => Container(
     padding: EdgeInsets.all(16.w), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16.r), border: Border.all(color: AppColors.border)),
@@ -290,7 +304,7 @@ class _CartScreenState extends State<CartScreen> {
         SizedBox(height: 18.h), Text('إتمام الطلب', style: TextStyle(fontSize: 21.sp, fontWeight: FontWeight.w900)), SizedBox(height: 4.h), Text('راجع عنوان التوصيل ثم أكد الطلب', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
         SizedBox(height: 18.h), _deliveryCard(), SizedBox(height: 12.h),
         Container(padding: EdgeInsets.all(14.w), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14.r), border: Border.all(color: AppColors.border)), child: Row(children: [const Icon(Icons.payments_outlined, color: AppColors.primary), SizedBox(width: 10.w), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('الدفع عند الاستلام', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w900)), Text('كاش', style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary))])), const Icon(Icons.check_circle_rounded, color: AppColors.primary)])),
-        SizedBox(height: 18.h), SizedBox(width: double.infinity, height: 54.h, child: ElevatedButton(onPressed: placingOrder ? null : () async { Navigator.pop(sheetContext); await _placeOrder(items); }, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r))), child: Text('تأكيد الطلب • ${(_subtotal(items) + deliveryFee).toStringAsFixed(0)} جنيه', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900)))),
+        SizedBox(height: 18.h), SizedBox(width: double.infinity, height: 54.h, child: ElevatedButton(onPressed: placingOrder ? null : () async { Navigator.of(sheetContext).pop(); await _placeOrder(items); }, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r))), child: Text('تأكيد الطلب • ${(_subtotal(items) + deliveryFee).toStringAsFixed(0)} جنيه', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900)))),
       ])),
     )));
   }
@@ -309,7 +323,7 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _field(TextEditingController controller, String hint, IconData icon, {TextInputType type = TextInputType.text, int lines = 1}) => TextField(controller: controller, keyboardType: type, maxLines: lines, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700), decoration: InputDecoration(hintText: hint, prefixIcon: Icon(icon, size: 19.sp, color: AppColors.textSecondary), filled: true, fillColor: const Color(0xFFF5F7F7), contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h), border: OutlineInputBorder(borderRadius: BorderRadius.circular(11.r), borderSide: BorderSide.none)));
 
-  Widget _empty() => Center(child: Padding(padding: EdgeInsets.all(28.w), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(width: 88.w, height: 88.w, decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(24.r)), child: Icon(Icons.shopping_bag_outlined, color: AppColors.primary, size: 40.sp)), SizedBox(height: 18.h), Text('سلتك فاضية', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w900)), SizedBox(height: 6.h), Text('اختار منتجاتك وهتظهر هنا جاهزة للطلب', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)), SizedBox(height: 20.h), TextButton(onPressed: () => Navigator.pop(context), child: const Text('الرجوع للتسوق'))])));
+  Widget _empty() => Center(child: Padding(padding: EdgeInsets.all(28.w), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(width: 88.w, height: 88.w, decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(24.r)), child: Icon(Icons.shopping_bag_outlined, color: AppColors.primary, size: 40.sp)), SizedBox(height: 18.h), Text('سلتك فاضية', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w900)), SizedBox(height: 6.h), Text('اختار منتجاتك وهتظهر هنا جاهزة للطلب', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)), SizedBox(height: 20.h), TextButton(onPressed: _returnToShopping, child: const Text('الرجوع للتسوق'))])));
 
   @override
   void dispose() {
