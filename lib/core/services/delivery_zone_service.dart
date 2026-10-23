@@ -27,6 +27,7 @@ class DeliveryZoneQuote {
 
   Map<String, dynamic> toOrderMap() => {
         'pricingType': 'zone',
+        'deliveryPricingType': 'zone',
         'storeZoneId': storeZoneId,
         'storeZoneName': storeZoneName,
         'customerZoneId': customerZoneId,
@@ -60,17 +61,15 @@ class DeliveryZoneService {
 
   static DeliveryZone zone(String id) => zones.firstWhere(
         (item) => item.id == id,
-        orElse: () => zones.first,
+        orElse: () => throw StateError('منطقة التوصيل غير صحيحة'),
       );
 
   static Future<String> getStoreZoneId(String storeId) async {
-    if (storeId.trim().isEmpty) return 'sohag_east';
-    try {
-      final snap = await FirebaseDatabase.instance.ref('stores/$storeId/deliveryZoneId').get();
-      final value = snap.value?.toString().trim() ?? '';
-      if (zones.any((item) => item.id == value)) return value;
-    } catch (_) {}
-    return 'sohag_east';
+    if (storeId.trim().isEmpty) throw StateError('تعذر تحديد المتجر');
+    final snap = await FirebaseDatabase.instance.ref('stores/$storeId/deliveryZoneId').get();
+    final value = snap.value?.toString().trim() ?? '';
+    if (zones.any((item) => item.id == value)) return value;
+    throw StateError('منطقة المتجر غير محددة');
   }
 
   static Future<double> _remotePrice(String from, String to) async {
