@@ -36,11 +36,6 @@ class HomeService {
     });
   }
 
-  /// Production-safe product feed.
-  ///
-  /// Never subscribe to the complete `/products` tree from a customer device.
-  /// Products are always scoped to one store and capped per request.
-  /// Firebase RTDB should have `.indexOn: ["storeId"]` under `/products`.
   Stream<List<Map<String, dynamic>>> getStoreProducts(
     String storeId, {
     int limit = 30,
@@ -48,12 +43,32 @@ class HomeService {
     final cleanStoreId = storeId.trim();
     if (cleanStoreId.isEmpty) return Stream.value(const []);
 
-    final query = db
-        .child('products')
-        .orderByChild('storeId')
-        .equalTo(cleanStoreId)
-        .limitToFirst(limit);
+    return _productQuery(
+      db.child('products')
+          .orderByChild('storeId')
+          .equalTo(cleanStoreId)
+          .limitToFirst(limit),
+    );
+  }
 
+  /// Scoped category feed. Never downloads the complete products tree.
+  /// Add `.indexOn: ["categoryId"]` under `/products` in RTDB rules.
+  Stream<List<Map<String, dynamic>>> getCategoryProducts(
+    String categoryId, {
+    int limit = 40,
+  }) {
+    final cleanCategoryId = categoryId.trim();
+    if (cleanCategoryId.isEmpty) return Stream.value(const []);
+
+    return _productQuery(
+      db.child('products')
+          .orderByChild('categoryId')
+          .equalTo(cleanCategoryId)
+          .limitToFirst(limit),
+    );
+  }
+
+  Stream<List<Map<String, dynamic>>> _productQuery(Query query) {
     return query.onValue.map((event) {
       final value = event.snapshot.value;
       if (value is! Map) return <Map<String, dynamic>>[];
@@ -63,6 +78,7 @@ class HomeService {
         if (raw is! Map) return;
         final item = Map<String, dynamic>.from(raw);
         item['firebaseKey'] = key.toString();
+        item['id'] ??= key.toString();
         if (item['isAvailable'] == false) return;
         products.add(item);
       });
