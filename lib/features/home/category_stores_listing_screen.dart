@@ -17,13 +17,14 @@ class CategoryStoresListingScreen extends StatefulWidget {
   });
 
   @override
-  State<CategoryStoresListingScreen> createState() => _CategoryStoresListingScreenState();
+  State<CategoryStoresListingScreen> createState() =>
+      _CategoryStoresListingScreenState();
 }
 
-class _CategoryStoresListingScreenState extends State<CategoryStoresListingScreen> {
+class _CategoryStoresListingScreenState
+    extends State<CategoryStoresListingScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  String _filter = 'all';
 
   @override
   void dispose() {
@@ -33,66 +34,77 @@ class _CategoryStoresListingScreenState extends State<CategoryStoresListingScree
 
   List<Map<String, dynamic>> _parseStores(dynamic value) {
     if (value is! Map) return [];
+
     final result = <Map<String, dynamic>>[];
     final requestedType = widget.storeType.trim().toLowerCase();
+
     Map<dynamic, dynamic>.from(value).forEach((key, raw) {
       if (raw is! Map) return;
+
       final store = Map<String, dynamic>.from(raw);
       store['firebaseKey'] = key.toString();
-      store['id'] = store['id']?.toString().trim().isNotEmpty == true ? store['id'].toString() : key.toString();
+      store['id'] = store['id']?.toString().trim().isNotEmpty == true
+          ? store['id'].toString()
+          : key.toString();
+
       final values = <String>{
         store['type']?.toString().trim().toLowerCase() ?? '',
         store['category']?.toString().trim().toLowerCase() ?? '',
         store['categoryId']?.toString().trim().toLowerCase() ?? '',
       };
-      const restaurantAliases = {'restaurant', 'restaurants', 'food', 'foods', 'مطعم', 'مطاعم'};
-      final matches = requestedType == 'restaurant' ? values.any(restaurantAliases.contains) : values.contains(requestedType);
+
+      const restaurantAliases = {
+        'restaurant',
+        'restaurants',
+        'food',
+        'foods',
+        'مطعم',
+        'مطاعم',
+      };
+
+      final matches = requestedType == 'restaurant'
+          ? values.any(restaurantAliases.contains)
+          : values.contains(requestedType);
+
       if (!matches || store['isActive'] == false) return;
       result.add(store);
     });
+
     result.sort((a, b) {
       final aSort = int.tryParse(a['sort']?.toString() ?? '0') ?? 0;
       final bSort = int.tryParse(b['sort']?.toString() ?? '0') ?? 0;
       return aSort.compareTo(bSort);
     });
+
     return result;
   }
 
-  List<Map<String, dynamic>> _filterStores(List<Map<String, dynamic>> stores) {
-    var result = [...stores];
+  List<Map<String, dynamic>> _searchStores(
+    List<Map<String, dynamic>> stores,
+  ) {
     final q = _query.trim().toLowerCase();
-    if (q.isNotEmpty) {
-      result = result.where((store) {
-        final text = [store['name'], store['address'], store['tags']].whereType<Object>().join(' ').toLowerCase();
-        return text.contains(q);
-      }).toList();
-    }
-    if (_filter == 'open') {
-      result = result.where((store) => store['isOpen'] != false).toList();
-    } else if (_filter == 'rating') {
-      result.sort((a, b) {
-        final ar = double.tryParse(a['rating']?.toString() ?? '0') ?? 0;
-        final br = double.tryParse(b['rating']?.toString() ?? '0') ?? 0;
-        return br.compareTo(ar);
-      });
-    } else if (_filter == 'fast') {
-      result.sort((a, b) => _minutes(a).compareTo(_minutes(b)));
-    }
-    return result;
-  }
+    if (q.isEmpty) return stores;
 
-  int _minutes(Map<String, dynamic> store) {
-    final text = store['deliveryTime']?.toString() ?? '';
-    final match = RegExp(r'\d+').firstMatch(text);
-    return int.tryParse(match?.group(0) ?? '') ?? 999;
+    return stores.where((store) {
+      final text = [
+        store['name'],
+        store['address'],
+        store['tags'],
+      ].whereType<Object>().join(' ').toLowerCase();
+      return text.contains(q);
+    }).toList();
   }
 
   String get _searchHint {
     switch (widget.storeType) {
-      case 'restaurant': return 'دور على مطعم أو أكلة...';
-      case 'supermarket': return 'دور على سوبر ماركت...';
-      case 'pharmacy': return 'دور على صيدلية...';
-      default: return 'دور على متجر...';
+      case 'restaurant':
+        return 'ابحث عن مطعم أو أكلة';
+      case 'supermarket':
+        return 'ابحث عن سوبر ماركت';
+      case 'pharmacy':
+        return 'ابحث عن صيدلية';
+      default:
+        return 'ابحث في ${widget.title}';
     }
   }
 
@@ -101,50 +113,64 @@ class _CategoryStoresListingScreenState extends State<CategoryStoresListingScree
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8F8F6),
+        backgroundColor: Colors.white,
         body: SafeArea(
           child: StreamBuilder<DatabaseEvent>(
             stream: FirebaseDatabase.instance.ref('stores').onValue,
             builder: (context, snapshot) {
-              final loading = snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData;
-              final stores = loading ? <Map<String, dynamic>>[] : _filterStores(_parseStores(snapshot.data?.snapshot.value));
+              final loading =
+                  snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData;
+              final stores = loading
+                  ? <Map<String, dynamic>>[]
+                  : _searchStores(
+                      _parseStores(snapshot.data?.snapshot.value),
+                    );
+
               return CustomScrollView(
-                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
                 slivers: [
                   SliverToBoxAdapter(child: _topBar()),
                   SliverToBoxAdapter(child: _search()),
-                  SliverToBoxAdapter(child: _filters()),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(18.w, 20.h, 18.w, 12.h),
-                      child: Row(children: [
-                        Text('كل ${widget.title}', style: TextStyle(color: AppColors.dark, fontSize: 20.sp, fontWeight: FontWeight.w900)),
-                        SizedBox(width: 8.w),
-                        if (!loading) Text('${stores.length}', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp, fontWeight: FontWeight.w700)),
-                      ]),
-                    ),
-                  ),
                   if (loading)
                     SliverPadding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.w),
-                      sliver: SliverList(delegate: SliverChildBuilderDelegate((_, __) => const _LoadingStoreCard(), childCount: 4)),
+                      padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 100.h),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (_, __) => const _LoadingStoreCard(),
+                          childCount: 5,
+                        ),
+                      ),
                     )
                   else if (stores.isEmpty)
-                    SliverFillRemaining(hasScrollBody: false, child: _empty())
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _empty(),
+                    )
                   else
                     SliverPadding(
-                      padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 110.h),
+                      padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 110.h),
                       sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          final store = stores[index];
-                          return Padding(
-                            padding: EdgeInsets.only(bottom: 18.h),
-                            child: _MarketplaceStoreCard(
-                              store: store,
-                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => legacy.StoreProductsScreen(store: store))),
-                            ),
-                          );
-                        }, childCount: stores.length),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final store = stores[index];
+                            return Padding(
+                              padding: EdgeInsets.only(bottom: 12.h),
+                              child: _DeliveryStoreCard(
+                                store: store,
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        legacy.StoreProductsScreen(store: store),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          childCount: stores.length,
+                        ),
                       ),
                     ),
                 ],
@@ -156,140 +182,248 @@ class _CategoryStoresListingScreenState extends State<CategoryStoresListingScree
     );
   }
 
-  Widget _topBar() => Container(
-    color: Colors.white,
-    padding: EdgeInsets.fromLTRB(12.w, 9.h, 16.w, 12.h),
-    child: Row(children: [
-      InkWell(onTap: () => Navigator.pop(context), borderRadius: BorderRadius.circular(50), child: SizedBox(width: 42.w, height: 42.w, child: Icon(Icons.arrow_back_ios_new_rounded, size: 19.sp, color: AppColors.dark))),
-      Expanded(child: Text(widget.title, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.dark, fontSize: 19.sp, fontWeight: FontWeight.w900))),
-      SizedBox(width: 42.w),
-    ]),
-  );
-
-  Widget _search() => Container(
-    color: Colors.white,
-    padding: EdgeInsets.fromLTRB(16.w, 0, 16.w, 14.h),
-    child: Container(
-      height: 50.h,
-      decoration: BoxDecoration(color: const Color(0xFFF4F5F2), borderRadius: BorderRadius.circular(14.r)),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (value) => setState(() => _query = value),
-        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.dark),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          hintText: _searchHint,
-          hintStyle: TextStyle(color: AppColors.textHint, fontSize: 12.5.sp, fontWeight: FontWeight.w600),
-          prefixIcon: Icon(Icons.search_rounded, color: AppColors.dark, size: 22.sp),
-          suffixIcon: _query.isEmpty ? null : IconButton(onPressed: () { _searchController.clear(); setState(() => _query = ''); }, icon: Icon(Icons.close_rounded, size: 19.sp)),
-          contentPadding: EdgeInsets.symmetric(vertical: 14.h),
-        ),
-      ),
-    ),
-  );
-
-  Widget _filters() {
-    const items = [('all', 'الكل', Icons.grid_view_rounded), ('open', 'مفتوح الآن', Icons.storefront_rounded), ('rating', 'الأعلى تقييمًا', Icons.star_outline_rounded), ('fast', 'الأسرع توصيلًا', Icons.bolt_rounded)];
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.only(bottom: 15.h),
+  Widget _topBar() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(8.w, 8.h, 8.w, 6.h),
       child: SizedBox(
-        height: 39.h,
-        child: ListView.separated(
-          reverse: true,
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: 16.w),
-          itemCount: items.length,
-          separatorBuilder: (_, __) => SizedBox(width: 8.w),
-          itemBuilder: (_, index) {
-            final item = items[index];
-            final selected = _filter == item.$1;
-            return InkWell(
-              onTap: () => setState(() => _filter = item.$1),
-              borderRadius: BorderRadius.circular(30.r),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                padding: EdgeInsets.symmetric(horizontal: 14.w),
-                decoration: BoxDecoration(color: selected ? AppColors.dark : Colors.white, borderRadius: BorderRadius.circular(30.r), border: Border.all(color: selected ? AppColors.dark : const Color(0xFFE2E4DF))),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(item.$3, size: 15.sp, color: selected ? Colors.white : AppColors.dark),
-                  SizedBox(width: 6.w),
-                  Text(item.$2, style: TextStyle(color: selected ? Colors.white : AppColors.dark, fontSize: 10.5.sp, fontWeight: FontWeight.w800)),
-                ]),
+        height: 44.h,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 19.sp,
+                  color: AppColors.dark,
+                ),
               ),
-            );
-          },
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 52.w),
+              child: Text(
+                widget.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppColors.dark,
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _empty() => Center(
-    child: Padding(
-      padding: EdgeInsets.all(28.w),
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.storefront_outlined, size: 54.sp, color: AppColors.textHint),
-        SizedBox(height: 14.h),
-        Text(_query.isEmpty ? 'مفيش متاجر متاحة حاليًا' : 'مفيش نتائج للبحث', style: TextStyle(color: AppColors.dark, fontSize: 17.sp, fontWeight: FontWeight.w900)),
-      ]),
-    ),
-  );
+  Widget _search() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 4.h, 16.w, 12.h),
+      child: Container(
+        height: 46.h,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF4F4F2),
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+        child: TextField(
+          controller: _searchController,
+          onChanged: (value) => setState(() => _query = value),
+          textInputAction: TextInputAction.search,
+          style: TextStyle(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w600,
+            color: AppColors.dark,
+          ),
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            hintText: _searchHint,
+            hintStyle: TextStyle(
+              color: AppColors.textHint,
+              fontSize: 12.5.sp,
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: Icon(
+              Icons.search_rounded,
+              color: AppColors.textSecondary,
+              size: 21.sp,
+            ),
+            suffixIcon: _query.isEmpty
+                ? null
+                : IconButton(
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _query = '');
+                    },
+                    icon: Icon(
+                      Icons.close_rounded,
+                      size: 18.sp,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+            contentPadding: EdgeInsets.symmetric(vertical: 13.h),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _empty() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(28.w),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.storefront_outlined,
+              size: 48.sp,
+              color: AppColors.textHint,
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              _query.isEmpty
+                  ? 'مفيش متاجر متاحة حاليًا'
+                  : 'مفيش نتائج للبحث',
+              style: TextStyle(
+                color: AppColors.dark,
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _MarketplaceStoreCard extends StatelessWidget {
+class _DeliveryStoreCard extends StatelessWidget {
   final Map<String, dynamic> store;
   final VoidCallback onTap;
-  const _MarketplaceStoreCard({required this.store, required this.onTap});
+
+  const _DeliveryStoreCard({
+    required this.store,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final name = store['name']?.toString().trim().isNotEmpty == true ? store['name'].toString() : 'متجر';
-    final cover = store['coverImage']?.toString().trim().isNotEmpty == true ? store['coverImage'].toString() : store['image']?.toString() ?? '';
-    final logo = store['image']?.toString() ?? '';
-    final tags = store['tags']?.toString() ?? '';
-    final address = store['address']?.toString() ?? '';
-    final rating = store['rating']?.toString().trim().isNotEmpty == true ? store['rating'].toString() : '4.5';
-    final time = store['deliveryTime']?.toString().trim().isNotEmpty == true ? store['deliveryTime'].toString() : '25 - 35 دقيقة';
+    final name = store['name']?.toString().trim().isNotEmpty == true
+        ? store['name'].toString()
+        : 'متجر';
+    final image = store['coverImage']?.toString().trim().isNotEmpty == true
+        ? store['coverImage'].toString()
+        : store['image']?.toString() ?? '';
+    final tags = store['tags']?.toString().trim() ?? '';
+    final address = store['address']?.toString().trim() ?? '';
+    final rating = store['rating']?.toString().trim() ?? '';
+    final time = store['deliveryTime']?.toString().trim().isNotEmpty == true
+        ? store['deliveryTime'].toString()
+        : '25 - 35 دقيقة';
     final fee = store['deliveryFee']?.toString().trim() ?? '';
     final isOpen = store['isOpen'] != false;
+    final subtitle = tags.isNotEmpty ? tags : address;
+
     return Opacity(
-      opacity: isOpen ? 1 : .72,
+      opacity: isOpen ? 1 : .62,
       child: Material(
-        color: Colors.transparent,
+        color: Colors.white,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(18.r),
-          child: Container(
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18.r), border: Border.all(color: const Color(0xFFE9EAE6))),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              ClipRRect(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(17.r)),
-                child: SizedBox(
-                  height: 145.h,
-                  width: double.infinity,
-                  child: Stack(fit: StackFit.expand, children: [
-                    _StoreImage(image: cover),
-                    if (!isOpen) Container(color: Colors.black.withOpacity(.48), alignment: Alignment.center, child: Container(padding: EdgeInsets.symmetric(horizontal: 13.w, vertical: 6.h), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20.r)), child: Text('مغلق حاليًا', style: TextStyle(color: AppColors.dark, fontSize: 11.sp, fontWeight: FontWeight.w900)))),
-                    Positioned(top: 11.h, left: 11.w, child: Container(padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 5.h), decoration: BoxDecoration(color: Colors.white.withOpacity(.96), borderRadius: BorderRadius.circular(9.r)), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.star_rounded, color: const Color(0xFFFFB800), size: 16.sp), SizedBox(width: 3.w), Text(rating, style: TextStyle(color: AppColors.dark, fontSize: 11.sp, fontWeight: FontWeight.w900))]))),
-                  ]),
+          borderRadius: BorderRadius.circular(12.r),
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 5.h),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10.r),
+                  child: SizedBox(
+                    width: 104.w,
+                    height: 92.h,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _StoreImage(image: image),
+                        if (!isOpen)
+                          Container(
+                            color: Colors.black.withOpacity(.42),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'مغلق',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(13.w, 12.h, 13.w, 13.h),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Container(width: 52.w, height: 52.w, padding: EdgeInsets.all(2.w), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12.r), border: Border.all(color: const Color(0xFFE6E7E3))), child: ClipRRect(borderRadius: BorderRadius.circular(10.r), child: _StoreImage(image: logo))),
-                  SizedBox(width: 11.w),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.dark, fontSize: 15.5.sp, fontWeight: FontWeight.w900)),
-                    if (tags.trim().isNotEmpty) ...[SizedBox(height: 3.h), Text(tags, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textSecondary, fontSize: 10.5.sp, fontWeight: FontWeight.w600))] else if (address.trim().isNotEmpty) ...[SizedBox(height: 3.h), Text(address, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textSecondary, fontSize: 10.5.sp, fontWeight: FontWeight.w600))],
-                    SizedBox(height: 9.h),
-                    Row(children: [_Meta(icon: Icons.schedule_rounded, text: time), SizedBox(width: 12.w), if (fee.isNotEmpty) _Meta(icon: Icons.delivery_dining_rounded, text: '$fee ج.م')]),
-                  ])),
-                  Padding(padding: EdgeInsets.only(top: 16.h), child: Icon(Icons.arrow_back_ios_new_rounded, color: const Color(0xFFB7BBB4), size: 14.sp)),
-                ]),
-              ),
-            ]),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 2.h),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.dark,
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        if (subtitle.isNotEmpty) ...[
+                          SizedBox(height: 4.h),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                        SizedBox(height: 9.h),
+                        Wrap(
+                          spacing: 7.w,
+                          runSpacing: 4.h,
+                          children: [
+                            _InlineMeta(
+                              icon: Icons.schedule_rounded,
+                              text: time,
+                            ),
+                            if (fee.isNotEmpty)
+                              _InlineMeta(
+                                icon: Icons.delivery_dining_outlined,
+                                text: '$fee ج.م',
+                              ),
+                            if (rating.isNotEmpty)
+                              _InlineMeta(
+                                icon: Icons.star_rounded,
+                                text: rating,
+                                star: true,
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -297,56 +431,153 @@ class _MarketplaceStoreCard extends StatelessWidget {
   }
 }
 
-class _Meta extends StatelessWidget {
+class _InlineMeta extends StatelessWidget {
   final IconData icon;
   final String text;
-  const _Meta({required this.icon, required this.text});
+  final bool star;
+
+  const _InlineMeta({
+    required this.icon,
+    required this.text,
+    this.star = false,
+  });
+
   @override
-  Widget build(BuildContext context) => Flexible(child: Row(mainAxisSize: MainAxisSize.min, children: [
-    Icon(icon, size: 14.sp, color: AppColors.textSecondary),
-    SizedBox(width: 4.w),
-    Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textSecondary, fontSize: 10.sp, fontWeight: FontWeight.w700))),
-  ]));
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 13.sp,
+          color: star ? const Color(0xFFFFB000) : AppColors.textSecondary,
+        ),
+        SizedBox(width: 3.w),
+        Text(
+          text,
+          maxLines: 1,
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 10.sp,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _StoreImage extends StatelessWidget {
   final String image;
+
   const _StoreImage({required this.image});
+
   @override
   Widget build(BuildContext context) {
     final value = image.trim();
     if (value.isEmpty) return _placeholder();
-    if (value.startsWith('http')) return Image.network(value, fit: BoxFit.cover, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => _placeholder());
+
+    if (value.startsWith('http')) {
+      return Image.network(
+        value,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _placeholder(),
+      );
+    }
+
+    if (value.startsWith('assets/')) {
+      return Image.asset(
+        value,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _placeholder(),
+      );
+    }
+
     try {
-      final clean = value.startsWith('data:image') ? value.split(',').last : value;
-      return Image.memory(base64Decode(clean), fit: BoxFit.cover, width: double.infinity, height: double.infinity);
-    } catch (_) { return _placeholder(); }
+      final clean = value.startsWith('data:image')
+          ? value.split(',').last
+          : value;
+      return Image.memory(
+        base64Decode(clean),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      );
+    } catch (_) {
+      return _placeholder();
+    }
   }
-  Widget _placeholder() => Container(color: const Color(0xFFF0F2EC), alignment: Alignment.center, child: Icon(Icons.storefront_rounded, color: AppColors.primary, size: 34.sp));
+
+  Widget _placeholder() {
+    return Container(
+      color: const Color(0xFFF0F2EC),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.storefront_rounded,
+        color: AppColors.primary,
+        size: 30.sp,
+      ),
+    );
+  }
 }
 
 class _LoadingStoreCard extends StatelessWidget {
   const _LoadingStoreCard();
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 18.h),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18.r), border: Border.all(color: const Color(0xFFE9EAE6))),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(height: 145.h, decoration: BoxDecoration(color: const Color(0xFFEEF0EC), borderRadius: BorderRadius.vertical(top: Radius.circular(17.r)))),
-        Padding(
-          padding: EdgeInsets.all(13.w),
-          child: Row(children: [
-            Container(width: 52.w, height: 52.w, decoration: BoxDecoration(color: const Color(0xFFEEF0EC), borderRadius: BorderRadius.circular(12.r))),
-            SizedBox(width: 11.w),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(height: 12.h, width: 130.w, color: const Color(0xFFEEF0EC)),
-              SizedBox(height: 8.h),
-              Container(height: 9.h, width: 190.w, color: const Color(0xFFEEF0EC)),
-            ])),
-          ]),
-        ),
-      ]),
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12.h),
+      child: Row(
+        children: [
+          Container(
+            width: 104.w,
+            height: 92.h,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF0EC),
+              borderRadius: BorderRadius.circular(10.r),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 13.h,
+                  width: 130.w,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF0EC),
+                    borderRadius: BorderRadius.circular(4.r),
+                  ),
+                ),
+                SizedBox(height: 9.h),
+                Container(
+                  height: 10.h,
+                  width: 180.w,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF0EC),
+                    borderRadius: BorderRadius.circular(4.r),
+                  ),
+                ),
+                SizedBox(height: 12.h),
+                Container(
+                  height: 9.h,
+                  width: 110.w,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF0EC),
+                    borderRadius: BorderRadius.circular(4.r),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
