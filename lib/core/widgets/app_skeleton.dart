@@ -10,6 +10,36 @@ class AppSkeleton extends StatelessWidget {
     required this.child,
   });
 
+  static Widget box({
+    required double width,
+    required double height,
+    double radius = 12,
+  }) {
+    return AppSkeleton(
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      ),
+    );
+  }
+
+  static Widget circle({required double size}) {
+    return AppSkeleton(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
