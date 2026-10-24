@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get_storage/get_storage.dart';
 
 import 'app.dart';
+import 'core/services/push_notification_service.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -10,6 +11,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  GetStorage.init;
+  await GetStorage.init();
+
+  // Do not block the first frame while FCM permission/token work completes.
+  PushNotificationService.initialize();
+
   runApp(const BringoApp());
 }
