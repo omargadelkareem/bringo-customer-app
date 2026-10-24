@@ -8,6 +8,8 @@ class AuthDbService {
   final GetStorage _box = GetStorage();
 
   static const String userIdKey = 'userId';
+  static const String accountNameKey = 'accountName';
+  static const String accountPhoneKey = 'accountPhone';
 
   Future<UserModel> register({
     required String name,
@@ -68,6 +70,14 @@ class AuthDbService {
 
   Future<void> _saveSession(UserModel user) async {
     await _box.write(userIdKey, user.id);
+
+    // Account identity uses dedicated keys. Checkout/order screens may use
+    // generic name/phone keys for delivery details and must never overwrite
+    // the registered account identity shown in Profile/Home.
+    await _box.write(accountNameKey, user.name);
+    await _box.write(accountPhoneKey, user.phone);
+
+    // Keep legacy keys for existing screens until they are migrated.
     await _box.write('userName', user.name);
     await _box.write('name', user.name);
     await _box.write('phone', user.phone);
@@ -86,5 +96,7 @@ class AuthDbService {
 
   Future<void> logout() async {
     await _box.remove(userIdKey);
+    await _box.remove(accountNameKey);
+    await _box.remove(accountPhoneKey);
   }
 }
