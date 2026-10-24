@@ -9,6 +9,7 @@ import 'package:bringo/core/routing/app_routes.dart';
 import 'package:bringo/core/services/adress_services.dart';
 import 'package:bringo/core/services/home_service.dart';
 import 'package:bringo/core/services/location_service.dart';
+import 'package:bringo/core/services/notification_service.dart';
 import 'package:bringo/core/widgets/app_skeleton.dart';
 import 'package:bringo/features/cart/cart_manager.dart';
 import 'package:bringo/features/cart/cart_screen.dart';
@@ -29,6 +30,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final HomeService homeService = HomeService();
+  final NotificationService notificationService = NotificationService();
   final GetStorage box = GetStorage();
 
   StreamSubscription<List<Map<String, dynamic>>>? _categoriesSubscription;
@@ -43,6 +45,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _storesLoading = true;
   bool isLoadingLocation = true;
   String locationText = 'جاري تحديد موقعك...';
+
+  String get _currentUserId =>
+      (box.read('userId') ?? box.read('uid') ?? box.read('id'))
+          ?.toString()
+          .trim() ??
+      '';
 
   static const List<String> _bannerImages = [
     'assets/images/bringo_res.png',
@@ -254,37 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: EdgeInsets.fromLTRB(14.w, 8.h, 14.w, 10.h),
           child: Row(
             children: [
-              StreamBuilder<DatabaseEvent>(
-                stream: FirebaseDatabase.instance.ref('notifications').onValue,
-                builder: (context, snapshot) {
-                  int unreadCount = 0;
-                  final value = snapshot.data?.snapshot.value;
-                  final currentUserId =
-                      (box.read('userId') ?? box.read('uid') ?? box.read('id'))
-                          ?.toString();
-                  if (value is Map) {
-                    for (final entry in value.values) {
-                      if (entry is! Map) continue;
-                      final notificationUserId =
-                          (entry['userId'] ?? entry['customerId'])?.toString();
-                      final belongsToUser = notificationUserId == null ||
-                          notificationUserId.isEmpty ||
-                          currentUserId == null ||
-                          notificationUserId == currentUserId;
-                      final isUnread = entry['isRead'] != true && entry['read'] != true;
-                      if (belongsToUser && isUnread) unreadCount++;
-                    }
-                  }
-                  return _appBarIcon(
-                    icon: Icons.notifications_none_rounded,
-                    badgeCount: unreadCount,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                    ),
-                  );
-                },
-              ),
+              _notificationButton(),
               SizedBox(width: 8.w),
               Expanded(
                 child: InkWell(
@@ -367,6 +345,32 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _notificationButton() {
+    final userId = _currentUserId;
+    if (userId.isEmpty) {
+      return _appBarIcon(
+        icon: Icons.notifications_none_rounded,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+        ),
+      );
+    }
+
+    return StreamBuilder<int>(
+      stream: notificationService.watchUnreadCount(userId),
+      initialData: 0,
+      builder: (context, snapshot) => _appBarIcon(
+        icon: Icons.notifications_none_rounded,
+        badgeCount: snapshot.data ?? 0,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const NotificationsScreen()),
         ),
       ),
     );
@@ -479,41 +483,39 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _horizontalStores(List<Map<String, dynamic>> stores,
       {required bool showDistance}) {
     return SizedBox(
-      height: 228.h,
+      height: 196.h,
       child: ListView.separated(
-        padding: EdgeInsets.symmetric(horizontal: 18.w),
-        scrollDirection: Axis.horizontal,
         reverse: true,
+        scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.symmetric(horizontal: 18.w),
         itemCount: stores.length,
-        separatorBuilder: (_, __) => SizedBox(width: 14.w),
-        itemBuilder: (_, index) => RepaintBoundary(
-          child: _StoreCard(
-            store: stores[index],
-            showDistance: showDistance,
-            onTap: () => _openStore(stores[index]),
-          ),
-        ),
+        separatorBuilder: (_, __) => SizedBox(width: 12.w),
+        itemBuilder: (_, index) {
+          final store = stores[index];
+          return _StoreCard(
+            store: store,
+            distanceKm: showDistance
+                ? double.tryParse(store['_distanceKm']?.toString() ?? '')
+                : null,
+            onTap: () => _openStore(store),
+          );
+        },
       ),
     );
   }
 
-  Widget _storesShimmer() {
-    return SizedBox(
-      height: 228.h,
-      child: ListView.separated(
-        padding: EdgeInsets.symmetric(horizontal: 18.w),
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 3,
-        separatorBuilder: (_, __) => SizedBox(width: 14.w),
-        itemBuilder: (_, __) => AppSkeleton(
-          child: Container(
-            width: 250.w,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24.r),
-            ),
+  Widget _emptyText(String text) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 18.h),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Text(
+          text,
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
@@ -534,192 +536,126 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSpacing: 12.h,
           childAspectRatio: .62,
         ),
-        itemBuilder: (_, __) => AppSkeleton(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20.r),
-            ),
-          ),
+        itemBuilder: (_, __) => Column(
+          children: [
+            AppSkeleton.circle(size: 62.w),
+            SizedBox(height: 8.h),
+            AppSkeleton.box(width: 54.w, height: 9.h, radius: 5.r),
+          ],
         ),
       ),
     );
   }
 
-  Widget _emptyText(String text) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 18.w),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(vertical: 26.h),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22.r),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          text,
-          style: TextStyle(
-            color: Colors.grey.shade600,
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w700,
+  Widget _storesShimmer() {
+    return SizedBox(
+      height: 196.h,
+      child: ListView.separated(
+        reverse: true,
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.symmetric(horizontal: 18.w),
+        itemCount: 3,
+        separatorBuilder: (_, __) => SizedBox(width: 12.w),
+        itemBuilder: (_, __) => Container(
+          width: 220.w,
+          padding: EdgeInsets.all(10.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16.r),
+            border: Border.all(color: const Color(0xFFE8ECEA)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppSkeleton.box(width: double.infinity, height: 112.h, radius: 12.r),
+              SizedBox(height: 10.h),
+              AppSkeleton.box(width: 120.w, height: 11.h, radius: 5.r),
+              SizedBox(height: 8.h),
+              AppSkeleton.box(width: 80.w, height: 8.h, radius: 5.r),
+            ],
           ),
         ),
       ),
     );
-  }
-
-  List<Map<String, dynamic>> _getCategories(List<Map<String, dynamic>> source) {
-    String normalize(String value) => value
-        .trim()
-        .toLowerCase()
-        .replaceAll('أ', 'ا')
-        .replaceAll('إ', 'ا')
-        .replaceAll('آ', 'ا')
-        .replaceAll('ة', 'ه')
-        .replaceAll('ى', 'ي')
-        .replaceAll(RegExp(r'\s+'), ' ');
-
-    final hiddenNames = <String>{
-      'بقاله', 'البقاله', 'البان والجبن', 'الالبان والجبن', 'البان وجبن',
-      'مخبوزات', 'المخبوزات', 'منظفات', 'المنظفات', 'عطاره', 'العطاره',
-      'عسل', 'العسل', 'عسل ومربي', 'عسل ومنتجات طبيعيه',
-      'العسل ومنتجات طبيعيه', 'مخللات', 'المخللات', 'مشروبات',
-      'المشروبات', 'سناكس', 'وجبات سريعه', 'مجمدات', 'المجمدات',
-    }.map(normalize).toSet();
-
-    const hiddenIds = <String>{
-      'grocery', 'dairy', 'bakery', 'cleaning', 'spices', 'honey',
-      'pickles', 'drinks', 'beverages', 'snacks', 'fast_food', 'fastfood',
-      'frozen',
-    };
-
-    final visible = source.where((category) {
-      if (category['isActive'] == false) return false;
-      final id = category['id']?.toString().trim().toLowerCase() ?? '';
-      final name = normalize(category['name']?.toString() ?? '');
-      return !hiddenIds.contains(id) && !hiddenNames.contains(name);
-    }).map(Map<String, dynamic>.from).toList();
-
-    visible.sort((a, b) =>
-        NumberHelper.toInt(a['sort']).compareTo(NumberHelper.toInt(b['sort'])));
-    return visible;
-  }
-
-  List<Map<String, dynamic>> _parseStores(dynamic value) {
-    if (value == null || value is! Map) return [];
-    final stores = <Map<String, dynamic>>[];
-    Map<dynamic, dynamic>.from(value).forEach((key, raw) {
-      if (raw is! Map) return;
-      final store = Map<String, dynamic>.from(raw);
-      store['id'] = store['id']?.toString().trim().isNotEmpty == true
-          ? store['id'].toString()
-          : key.toString();
-      if (store['isActive'] != false) stores.add(store);
-    });
-    return stores;
   }
 
   void _openCategory(Map<String, dynamic> item) {
-    final id = item['id']?.toString().trim().toLowerCase() ?? '';
+    final type = (item['type'] ?? item['storeType'] ?? item['slug'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+    final id = (item['id'] ?? item['firebaseKey'] ?? '').toString().trim();
     final name = item['name']?.toString().trim() ?? '';
-    final normalized = _normalize(name);
+    final storeType = type.isNotEmpty ? type : id;
+    if (storeType.isEmpty) return;
 
-    String? storeType;
-    if (id == 'restaurants' ||
-        id == 'restaurant' ||
-        normalized.contains('مطعم') ||
-        normalized.contains('مطاعم')) {
-      storeType = 'restaurant';
-    } else if (id == 'supermarket' || id == 'grocery_store' || id == 'grocery' ||
-        normalized.contains('سوبر ماركت') || normalized.contains('سوبرماركت')) {
-      storeType = 'supermarket';
-    } else {
-      storeType = _resolveStoreType(id, normalized);
-    }
-
-    if (storeType != null) {
-      Navigator.of(context).push(MaterialPageRoute(
+    Navigator.of(context).push(
+      MaterialPageRoute(
         builder: (_) => CategoryStoresScreen(
-          storeType: storeType!,
-          title: name.isEmpty ? 'المتاجر' : name,
+          storeType: storeType,
+          title: name.isNotEmpty ? name : 'المتاجر',
         ),
-      ));
-      return;
-    }
-
-    context.push(AppRoutes.categoryProducts,
-        extra: {'categoryId': id, 'categoryName': name});
-  }
-
-  String _normalize(String value) => value
-      .trim()
-      .toLowerCase()
-      .replaceAll('أ', 'ا')
-      .replaceAll('إ', 'ا')
-      .replaceAll('آ', 'ا')
-      .replaceAll('ة', 'ه')
-      .replaceAll('ى', 'ي')
-      .replaceAll(RegExp(r'\s+'), ' ');
-
-  String? _resolveStoreType(String id, String name) {
-    const byId = <String, String>{
-      'pharmacy': 'pharmacy', 'pharmacies': 'pharmacy',
-      'vegetables': 'vegetables', 'fruits': 'vegetables',
-      'vegetables_fruits': 'vegetables', 'beauty': 'beauty',
-      'cosmetics': 'beauty', 'meat': 'meat', 'butcher': 'meat',
-      'bakery': 'bakery', 'bakeries': 'bakery', 'fish': 'fish',
-      'seafood': 'fish', 'market': 'market',
-    };
-    if (byId.containsKey(id)) return byId[id];
-    if (name.contains('صيدلي')) return 'pharmacy';
-    if (name.contains('خضار') || name.contains('خضروات') ||
-        name.contains('فاكه') || name.contains('فواكه')) return 'vegetables';
-    if (name.contains('تجميل') || name.contains('عنايه شخصيه')) return 'beauty';
-    if (name.contains('لحوم') || name.contains('دواجن')) return 'meat';
-    if (name.contains('مخبز') || name.contains('مخابز') || name.contains('حلويات')) {
-      return 'bakery';
-    }
-    if (name.contains('اسماك') || name.contains('مأكولات بحريه')) return 'fish';
-    return null;
+      ),
+    );
   }
 
   void _openStore(Map<String, dynamic> store) {
-    final type = store['type']?.toString().toLowerCase() ?? '';
-    if (type == 'restaurant') {
-      context.push(AppRoutes.restaurantDetails, extra: store);
-    } else if (type == 'supermarket' || type == 'grocery') {
-      context.push(AppRoutes.supermarket);
-    } else {
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => StoreProductsScreen(store: store),
-      ));
-    }
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => StoreProductsScreen(store: store)),
+    );
   }
 
-  double? _storeLatitude(Map<String, dynamic> store) => double.tryParse(
-      (store['latitude'] ?? store['lat'] ?? store['location']?['latitude'] ??
-                  store['location']?['lat'])
-              ?.toString() ??
-          '');
+  List<Map<String, dynamic>> _getCategories(List<Map<String, dynamic>> items) {
+    final result = items.where((item) => item['isActive'] != false).toList();
+    result.sort((a, b) {
+      final aSort = NumberHelper.toInt(a['sort']);
+      final bSort = NumberHelper.toInt(b['sort']);
+      return aSort.compareTo(bSort);
+    });
+    return result;
+  }
 
-  double? _storeLongitude(Map<String, dynamic> store) => double.tryParse(
-      (store['longitude'] ?? store['lng'] ?? store['location']?['longitude'] ??
-                  store['location']?['lng'])
-              ?.toString() ??
-          '');
+  List<Map<String, dynamic>> _parseStores(dynamic value) {
+    if (value is! Map) return [];
+    final result = <Map<String, dynamic>>[];
+    Map<dynamic, dynamic>.from(value).forEach((key, raw) {
+      if (raw is! Map) return;
+      final store = Map<String, dynamic>.from(raw);
+      if (store['isActive'] == false) return;
+      store['firebaseKey'] = key.toString();
+      store['id'] = store['id']?.toString().trim().isNotEmpty == true
+          ? store['id'].toString()
+          : key.toString();
+      result.add(store);
+    });
+    return result;
+  }
+
+  double? _storeLatitude(Map<String, dynamic> store) {
+    return NumberHelper.toDouble(
+      store['latitude'] ?? store['lat'] ?? store['location']?['latitude'],
+    );
+  }
+
+  double? _storeLongitude(Map<String, dynamic> store) {
+    return NumberHelper.toDouble(
+      store['longitude'] ?? store['lng'] ?? store['location']?['longitude'],
+    );
+  }
 
   double _distanceKm(double lat1, double lon1, double lat2, double lon2) {
-    const r = 6371.0;
-    final dLat = _rad(lat2 - lat1);
-    final dLon = _rad(lon2 - lon1);
+    const earthRadius = 6371.0;
+    double toRad(double degree) => degree * math.pi / 180;
+    final dLat = toRad(lat2 - lat1);
+    final dLon = toRad(lon2 - lon1);
     final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_rad(lat1)) * math.cos(_rad(lat2)) *
-            math.sin(dLon / 2) * math.sin(dLon / 2);
-    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+        math.cos(toRad(lat1)) *
+            math.cos(toRad(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    return earthRadius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
   }
-
-  double _rad(double value) => value * math.pi / 180;
 }
 
 class _HomeBannerCarousel extends StatefulWidget {
@@ -732,91 +668,88 @@ class _HomeBannerCarousel extends StatefulWidget {
 
 class _HomeBannerCarouselState extends State<_HomeBannerCarousel> {
   late final PageController _controller;
-  final ValueNotifier<int> _page = ValueNotifier<int>(0);
   Timer? _timer;
+  int _index = 0;
 
   @override
   void initState() {
     super.initState();
-    _controller = PageController(viewportFraction: .90);
-    _startTimer();
-  }
-
-  void _startTimer() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!_controller.hasClients || widget.images.length < 2) return;
-      final next = (_page.value + 1) % widget.images.length;
-      _controller.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 420),
-        curve: Curves.easeInOutCubic,
-      );
-    });
+    _controller = PageController(viewportFraction: .91);
+    if (widget.images.length > 1) {
+      _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (!mounted || !_controller.hasClients) return;
+        final next = (_index + 1) % widget.images.length;
+        _controller.animateToPage(
+          next,
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.easeOutCubic,
+        );
+      });
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _page.dispose();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.images.isEmpty) return const SizedBox.shrink();
     return Column(
       children: [
         SizedBox(
-          height: 142.h,
+          height: 148.h,
           child: PageView.builder(
             controller: _controller,
             itemCount: widget.images.length,
-            allowImplicitScrolling: true,
-            physics: const PageScrollPhysics(),
-            onPageChanged: (index) {
-              _page.value = index;
-              _startTimer();
-            },
+            onPageChanged: (value) => setState(() => _index = value),
             itemBuilder: (_, index) => Padding(
-              padding: EdgeInsets.symmetric(horizontal: 5.w),
+              padding: EdgeInsets.symmetric(horizontal: 4.w),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(16.r),
+                borderRadius: BorderRadius.circular(18.r),
                 child: Image.asset(
                   widget.images[index],
-                  width: double.infinity,
-                  height: 142.h,
                   fit: BoxFit.cover,
-                  filterQuality: FilterQuality.low,
-                  gaplessPlayback: true,
                   cacheWidth: 900,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: AppColors.primary,
+                    alignment: Alignment.center,
+                    child: Text(
+                      'Bringo',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24.sp,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
         ),
-        SizedBox(height: 9.h),
-        ValueListenableBuilder<int>(
-          valueListenable: _page,
-          builder: (_, page, __) => Row(
+        if (widget.images.length > 1) ...[
+          SizedBox(height: 9.h),
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(widget.images.length, (index) {
-              final active = page == index;
+              final selected = index == _index;
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 margin: EdgeInsets.symmetric(horizontal: 3.w),
-                width: active ? 20.w : 7.w,
-                height: 7.h,
+                width: selected ? 16.w : 6.w,
+                height: 6.w,
                 decoration: BoxDecoration(
-                  color: active
-                      ? AppColors.primary
-                      : AppColors.primary.withOpacity(.28),
+                  color: selected ? AppColors.primary : const Color(0xFFD8DEDC),
                   borderRadius: BorderRadius.circular(20.r),
                 ),
               );
             }),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -826,38 +759,48 @@ class _CategoryItem extends StatelessWidget {
   final String title;
   final String image;
   final VoidCallback onTap;
-  const _CategoryItem({required this.title, required this.image, required this.onTap});
+
+  const _CategoryItem({
+    required this.title,
+    required this.image,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(20.r),
       onTap: onTap,
+      borderRadius: BorderRadius.circular(14.r),
       child: Column(
         children: [
-          SizedBox(
-            width: 92.w,
-            height: 92.w,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20.r),
-              child: _SmartImage(
-                image: image,
-                fit: BoxFit.cover,
-                icon: Icons.category_rounded,
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(7.w),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F3),
+                borderRadius: BorderRadius.circular(14.r),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(11.r),
+                child: _AdaptiveImage(
+                  value: image,
+                  fallbackIcon: Icons.category_outlined,
+                ),
               ),
             ),
           ),
-          SizedBox(height: 8.h),
+          SizedBox(height: 7.h),
           Text(
             title,
-            textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.dark,
-              fontSize: 8.sp,
+              fontSize: 10.5.sp,
               height: 1.25,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -868,209 +811,209 @@ class _CategoryItem extends StatelessWidget {
 
 class _StoreCard extends StatelessWidget {
   final Map<String, dynamic> store;
-  final bool showDistance;
+  final double? distanceKm;
   final VoidCallback onTap;
-  const _StoreCard({required this.store, required this.showDistance, required this.onTap});
+
+  const _StoreCard({
+    required this.store,
+    required this.distanceKm,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final name = store['name']?.toString() ?? 'متجر Bringo';
-    final image = (store['coverImage'] ?? store['image'])?.toString() ?? '';
-    final rating = double.tryParse(store['rating']?.toString() ?? '0') ?? 0;
-    final deliveryTime = store['deliveryTime']?.toString().trim().isNotEmpty == true
-        ? store['deliveryTime'].toString()
-        : '25 - 35 دقيقة';
-    final deliveryFee = double.tryParse(store['deliveryFee']?.toString() ?? '0') ?? 0;
-    final distance = double.tryParse(store['_distanceKm']?.toString() ?? '');
+    final name = store['name']?.toString().trim().isNotEmpty == true
+        ? store['name'].toString()
+        : 'متجر';
+    final image = (store['coverImage'] ?? store['image'] ?? '').toString();
+    final rating = NumberHelper.toDouble(store['rating']);
+    final deliveryTime = store['deliveryTime']?.toString().trim() ?? '';
+    final subtitle = store['tags']?.toString().trim().isNotEmpty == true
+        ? store['tags'].toString()
+        : store['address']?.toString() ?? '';
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24.r),
-      child: Container(
-        width: 250.w,
-        padding: EdgeInsets.all(10.w),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24.r),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(.04),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
+    return SizedBox(
+      width: 220.w,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16.r),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16.r),
+              border: Border.all(color: const Color(0xFFE8ECEA)),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(19.r),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _SmartImage(image: image, fit: BoxFit.cover, icon: Icons.storefront_rounded),
-                    Positioned(
-                      top: 9.h,
-                      right: 9.w,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 9.w, vertical: 5.h),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(.94),
-                          borderRadius: BorderRadius.circular(14.r),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(15.r)),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 112.h,
+                    child: _AdaptiveImage(
+                      value: image,
+                      fallbackIcon: Icons.storefront_rounded,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(10.w, 8.h, 10.w, 8.h),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Icon(Icons.star_rounded,
-                                color: const Color(0xFFFFB800), size: 15.sp),
-                            SizedBox(width: 3.w),
-                            Text(
-                              rating > 0 ? rating.toStringAsFixed(1) : 'جديد',
-                              style: TextStyle(
-                                color: AppColors.dark,
-                                fontSize: 10.5.sp,
-                                fontWeight: FontWeight.w900,
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: AppColors.dark,
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
                             ),
+                            if (rating != null) ...[
+                              SizedBox(width: 5.w),
+                              Icon(Icons.star_rounded,
+                                  color: const Color(0xFFFFB800), size: 14.sp),
+                              SizedBox(width: 2.w),
+                              Text(
+                                rating.toStringAsFixed(1),
+                                style: TextStyle(
+                                  color: AppColors.dark,
+                                  fontSize: 9.sp,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                      ),
+                        if (subtitle.isNotEmpty) ...[
+                          SizedBox(height: 3.h),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 9.5.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Row(
+                          children: [
+                            if (deliveryTime.isNotEmpty) ...[
+                              Icon(Icons.schedule_rounded,
+                                  size: 12.sp, color: AppColors.textSecondary),
+                              SizedBox(width: 3.w),
+                              Flexible(
+                                child: Text(
+                                  deliveryTime,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 8.5.sp,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (distanceKm != null) ...[
+                              SizedBox(width: 8.w),
+                              Text(
+                                '${distanceKm!.toStringAsFixed(1)} كم',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 8.5.sp,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            SizedBox(height: 10.h),
-            Text(name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: AppColors.dark, fontSize: 15.sp, fontWeight: FontWeight.w900)),
-            SizedBox(height: 4.h),
-            Text(_typeLabel(store['type']?.toString() ?? ''),
-                style: TextStyle(
-                    color: Colors.grey.shade600, fontSize: 11.sp, fontWeight: FontWeight.w700)),
-            SizedBox(height: 8.h),
-            Row(
-              children: [
-                if (showDistance && distance != null) ...[
-                  _Info(icon: Icons.near_me_rounded, text: '${distance.toStringAsFixed(1)} كم'),
-                  SizedBox(width: 6.w),
-                ],
-                _Info(
-                  icon: Icons.delivery_dining_rounded,
-                  text: deliveryFee <= 0 ? 'توصيل مجاني' : '${deliveryFee.toStringAsFixed(0)} ج',
-                ),
-                const Spacer(),
-                _Info(icon: Icons.schedule_rounded, text: deliveryTime),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
-
-  String _typeLabel(String value) {
-    switch (value.toLowerCase()) {
-      case 'restaurant': return 'مطعم';
-      case 'supermarket':
-      case 'grocery': return 'سوبر ماركت';
-      case 'pharmacy': return 'صيدلية';
-      default: return 'متجر';
-    }
-  }
 }
 
-class _Info extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  const _Info({required this.icon, required this.text});
+class _AdaptiveImage extends StatelessWidget {
+  final String value;
+  final IconData fallbackIcon;
 
-  @override
-  Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: AppColors.primary, size: 13.sp),
-          SizedBox(width: 3.w),
-          Text(text,
-              style: TextStyle(
-                  color: Colors.grey.shade700, fontSize: 9.5.sp, fontWeight: FontWeight.w800)),
-        ],
-      );
-}
-
-class _SmartImage extends StatelessWidget {
-  final String image;
-  final BoxFit fit;
-  final IconData icon;
-  const _SmartImage({required this.image, required this.fit, required this.icon});
+  const _AdaptiveImage({required this.value, required this.fallbackIcon});
 
   @override
   Widget build(BuildContext context) {
-    final clean = image.trim();
-    if (clean.isEmpty) return _fallback();
-
-    if (clean.startsWith('data:image')) {
-      try {
-        return Image.memory(
-          base64Decode(clean.split(',').last),
-          fit: fit,
-          width: double.infinity,
-          height: double.infinity,
-          gaplessPlayback: true,
-          filterQuality: FilterQuality.low,
-          cacheWidth: 700,
-        );
-      } catch (_) {
-        return _fallback();
-      }
-    }
-
-    if (clean.startsWith('http')) {
+    final image = value.trim();
+    if (image.isEmpty) return _placeholder();
+    if (image.startsWith('http')) {
       return Image.network(
-        clean,
-        fit: fit,
+        image,
+        fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        gaplessPlayback: true,
-        filterQuality: FilterQuality.low,
-        cacheWidth: 700,
-        loadingBuilder: (context, child, progress) => progress == null ? child : _fallback(),
-        errorBuilder: (_, __, ___) => _fallback(),
+        errorBuilder: (_, __, ___) => _placeholder(),
       );
     }
-
+    if (image.startsWith('assets/')) {
+      return Image.asset(
+        image,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _placeholder(),
+      );
+    }
     try {
+      final clean = image.startsWith('data:image') ? image.split(',').last : image;
       return Image.memory(
         base64Decode(clean),
-        fit: fit,
+        fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        gaplessPlayback: true,
-        filterQuality: FilterQuality.low,
-        cacheWidth: 700,
+        errorBuilder: (_, __, ___) => _placeholder(),
       );
     } catch (_) {
-      return _fallback();
+      return _placeholder();
     }
   }
 
-  Widget _fallback() => Container(
-        color: const Color(0xFFFFF7FB),
-        padding: EdgeInsets.all(12.w),
-        child: Image.asset(
-          'assets/images/bringo.png',
-          fit: BoxFit.contain,
-          filterQuality: FilterQuality.low,
-          errorBuilder: (_, __, ___) => Center(
-            child: Icon(icon, color: AppColors.primary.withOpacity(.45), size: 38.sp),
-          ),
-        ),
-      );
+  Widget _placeholder() {
+    return Container(
+      color: const Color(0xFFF0F3F1),
+      alignment: Alignment.center,
+      child: Icon(fallbackIcon, color: AppColors.primary, size: 30.sp),
+    );
+  }
 }
 
 class NumberHelper {
-  static int toInt(dynamic value) => int.tryParse(value?.toString() ?? '0') ?? 0;
+  static int toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static double? toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
+  }
 }
