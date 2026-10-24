@@ -36,7 +36,7 @@ class AuthDbService {
     );
 
     await newUserRef.set(user.toJson());
-    await saveUserId(user.id);
+    await _saveSession(user);
     await PushNotificationService.syncForCurrentUser();
 
     return user;
@@ -61,9 +61,17 @@ class AuthDbService {
       throw Exception('كلمة المرور غير صحيحة');
     }
 
-    await saveUserId(user.id);
+    await _saveSession(user);
     await PushNotificationService.syncForCurrentUser();
     return user;
+  }
+
+  Future<void> _saveSession(UserModel user) async {
+    await _box.write(userIdKey, user.id);
+    await _box.write('userName', user.name);
+    await _box.write('name', user.name);
+    await _box.write('phone', user.phone);
+    await _box.write('address', user.address);
   }
 
   Future<void> saveUserId(String userId) async {
