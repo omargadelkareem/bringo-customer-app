@@ -28,16 +28,13 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
   ];
 
   String get _customerName {
-    final values = [
-      _box.read('name'),
-      _box.read('fullName'),
-      _box.read('userName'),
-      _box.read('customerName'),
-    ];
-    for (final value in values) {
-      final text = value?.toString().trim() ?? '';
-      if (text.isNotEmpty && text != 'null') return text.split(' ').first;
-    }
+    final value = _box.read('accountName');
+    final text = value?.toString().trim() ?? '';
+    if (text.isNotEmpty && text != 'null') return text.split(' ').first;
+
+    // Backward compatibility for sessions created before accountName existed.
+    final legacy = _box.read('userName')?.toString().trim() ?? '';
+    if (legacy.isNotEmpty && legacy != 'null') return legacy.split(' ').first;
     return 'بيك';
   }
 
