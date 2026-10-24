@@ -1,4 +1,5 @@
 import 'package:bringo/core/models/user_models.dart';
+import 'package:bringo/core/services/push_notification_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:get_storage/get_storage.dart';
 
@@ -36,6 +37,7 @@ class AuthDbService {
 
     await newUserRef.set(user.toJson());
     await saveUserId(user.id);
+    await PushNotificationService.syncForCurrentUser();
 
     return user;
   }
@@ -60,6 +62,7 @@ class AuthDbService {
     }
 
     await saveUserId(user.id);
+    await PushNotificationService.syncForCurrentUser();
     return user;
   }
 
