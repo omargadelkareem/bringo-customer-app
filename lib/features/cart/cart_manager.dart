@@ -14,6 +14,14 @@ class CartManager {
     );
   }
 
+  static double get subtotal {
+    return items.fold<double>(0, (sum, item) {
+      final price = double.tryParse(item['price']?.toString() ?? '0') ?? 0;
+      final quantity = int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
+      return sum + (price * quantity);
+    });
+  }
+
   static String get storeId {
     if (items.isEmpty) return '';
     return items.first['storeId']?.toString().trim() ?? '';
