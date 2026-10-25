@@ -14,7 +14,7 @@ class AppCachedImage extends StatelessWidget {
     super.key,
     required this.image,
     this.fit = BoxFit.cover,
-    this.icon = Icons.image_rounded,
+    this.icon = Icons.image_outlined,
   });
 
   @override
@@ -72,7 +72,7 @@ class AppCachedImage extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: AppColors.softPink.withOpacity(.45),
+      color: const Color(0xFFF4F6F5),
       child: Center(
         child: SizedBox(
           width: 22.w,
@@ -90,11 +90,20 @@ class AppCachedImage extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: AppColors.softPink,
-      child: Icon(
-        icon,
-        color: AppColors.primary,
-        size: 28.sp,
+      color: const Color(0xFFF4F6F5),
+      alignment: Alignment.center,
+      child: Container(
+        width: 48.w,
+        height: 48.w,
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(.08),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          color: AppColors.primary.withOpacity(.72),
+          size: 25.sp,
+        ),
       ),
     );
   }
