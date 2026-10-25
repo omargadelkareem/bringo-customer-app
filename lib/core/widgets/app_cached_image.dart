@@ -10,32 +10,23 @@ class AppCachedImage extends StatelessWidget {
   final BoxFit fit;
   final IconData icon;
   final String? fallbackKey;
-
   const AppCachedImage({super.key, required this.image, this.fit = BoxFit.cover, this.icon = Icons.image_rounded, this.fallbackKey});
-
   @override
   Widget build(BuildContext context) {
     final cleanImage = image.trim();
     if (cleanImage.isEmpty) return _fallback();
-    if (cleanImage.startsWith('http')) {
-      return CachedNetworkImage(imageUrl: cleanImage, fit: fit, width: double.infinity, height: double.infinity, placeholder: (_, __) => _loading(), errorWidget: (_, __, ___) => _fallback());
-    }
+    if (cleanImage.startsWith('http')) return CachedNetworkImage(imageUrl: cleanImage, fit: fit, width: double.infinity, height: double.infinity, placeholder: (_, __) => _loading(), errorWidget: (_, __, ___) => _fallback());
     try {
       final source = cleanImage.startsWith('data:image') ? cleanImage.split(',').last : cleanImage;
       return Image.memory(base64Decode(source), fit: fit, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => _fallback());
-    } catch (_) {
-      return _fallback();
-    }
+    } catch (_) { return _fallback(); }
   }
-
   Widget _loading() => Container(width: double.infinity, height: double.infinity, color: AppColors.softPink.withOpacity(.45), child: Center(child: SizedBox(width: 22.w, height: 22.w, child: const CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))));
-
   String _fallbackAsset() {
     final key = (fallbackKey ?? '').toLowerCase();
     if (key.contains('كريب') || key.contains('crepe')) return 'assets/images/default_crepe.jpg';
     if (key.contains('فرايد') || key.contains('تشيكن') || key.contains('فراخ') || key.contains('استربس') || key.contains('زنجر') || key.contains('بانيه') || key.contains('كرانشي') || key.contains('chicken')) return 'assets/images/default_fried_chicken.jpg';
     return 'assets/images/default_sandwich.jpg';
   }
-
   Widget _fallback() => Image.asset(_fallbackAsset(), fit: fit, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => Container(width: double.infinity, height: double.infinity, color: AppColors.softPink, child: Icon(icon, color: AppColors.primary, size: 28.sp)));
 }
