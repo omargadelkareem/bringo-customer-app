@@ -9,21 +9,21 @@ class AppCachedImage extends StatelessWidget {
   final String image;
   final BoxFit fit;
   final IconData icon;
+  final String? fallbackKey;
 
   const AppCachedImage({
     super.key,
     required this.image,
     this.fit = BoxFit.cover,
-    this.icon = Icons.image_outlined,
+    this.icon = Icons.image_rounded,
+    this.fallbackKey,
   });
 
   @override
   Widget build(BuildContext context) {
     final cleanImage = image.trim();
 
-    if (cleanImage.isEmpty) {
-      return _fallback();
-    }
+    if (cleanImage.isEmpty) return _fallback();
 
     if (cleanImage.startsWith('http')) {
       return CachedNetworkImage(
@@ -38,11 +38,8 @@ class AppCachedImage extends StatelessWidget {
 
     if (cleanImage.startsWith('data:image')) {
       try {
-        final base64String = cleanImage.split(',').last;
-        final bytes = base64Decode(base64String);
-
         return Image.memory(
-          bytes,
+          base64Decode(cleanImage.split(',').last),
           fit: fit,
           width: double.infinity,
           height: double.infinity,
@@ -54,10 +51,8 @@ class AppCachedImage extends StatelessWidget {
     }
 
     try {
-      final bytes = base64Decode(cleanImage);
-
       return Image.memory(
-        bytes,
+        base64Decode(cleanImage),
         fit: fit,
         width: double.infinity,
         height: double.infinity,
@@ -72,7 +67,7 @@ class AppCachedImage extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: const Color(0xFFF4F6F5),
+      color: AppColors.softPink.withOpacity(.45),
       child: Center(
         child: SizedBox(
           width: 22.w,
@@ -86,24 +81,35 @@ class AppCachedImage extends StatelessWidget {
     );
   }
 
+  String _fallbackAsset() {
+    final key = (fallbackKey ?? '').toLowerCase();
+    if (key.contains('كريب') || key.contains('crepe')) {
+      return 'assets/images/default_crepe.jpg';
+    }
+    if (key.contains('فرايد') ||
+        key.contains('تشيكن') ||
+        key.contains('فراخ') ||
+        key.contains('استربس') ||
+        key.contains('زنجر') ||
+        key.contains('بانيه') ||
+        key.contains('كرانشي') ||
+        key.contains('chicken')) {
+      return 'assets/images/default_fried_chicken.jpg';
+    }
+    return 'assets/images/default_sandwich.jpg';
+  }
+
   Widget _fallback() {
-    return Container(
+    return Image.asset(
+      _fallbackAsset(),
+      fit: fit,
       width: double.infinity,
       height: double.infinity,
-      color: const Color(0xFFF4F6F5),
-      alignment: Alignment.center,
-      child: Container(
-        width: 48.w,
-        height: 48.w,
-        decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(.08),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          color: AppColors.primary.withOpacity(.72),
-          size: 25.sp,
-        ),
+      errorBuilder: (_, __, ___) => Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: AppColors.softPink,
+        child: Icon(icon, color: AppColors.primary, size: 28.sp),
       ),
     );
   }
