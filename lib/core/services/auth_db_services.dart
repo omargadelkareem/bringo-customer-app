@@ -1,4 +1,5 @@
 import 'package:bringo/core/models/user_models.dart';
+import 'package:bringo/core/services/push_notification_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:get_storage/get_storage.dart';
 
@@ -7,6 +8,8 @@ class AuthDbService {
   final GetStorage _box = GetStorage();
 
   static const String userIdKey = 'userId';
+  static const String accountNameKey = 'accountName';
+  static const String accountPhoneKey = 'accountPhone';
 
   Future<UserModel> register({
     required String name,
@@ -35,7 +38,8 @@ class AuthDbService {
     );
 
     await newUserRef.set(user.toJson());
-    await saveUserId(user.id);
+    await _saveSession(user);
+    await PushNotificationService.syncForCurrentUser();
 
     return user;
   }
@@ -59,8 +63,25 @@ class AuthDbService {
       throw Exception('كلمة المرور غير صحيحة');
     }
 
-    await saveUserId(user.id);
+    await _saveSession(user);
+    await PushNotificationService.syncForCurrentUser();
     return user;
+  }
+
+  Future<void> _saveSession(UserModel user) async {
+    await _box.write(userIdKey, user.id);
+
+    // Account identity uses dedicated keys. Checkout/order screens may use
+    // generic name/phone keys for delivery details and must never overwrite
+    // the registered account identity shown in Profile/Home.
+    await _box.write(accountNameKey, user.name);
+    await _box.write(accountPhoneKey, user.phone);
+
+    // Keep legacy keys for existing screens until they are migrated.
+    await _box.write('userName', user.name);
+    await _box.write('name', user.name);
+    await _box.write('phone', user.phone);
+    await _box.write('address', user.address);
   }
 
   Future<void> saveUserId(String userId) async {
@@ -75,5 +96,7 @@ class AuthDbService {
 
   Future<void> logout() async {
     await _box.remove(userIdKey);
+    await _box.remove(accountNameKey);
+    await _box.remove(accountPhoneKey);
   }
 }

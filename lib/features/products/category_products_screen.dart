@@ -19,7 +19,7 @@ class CategoryProductsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final HomeService homeService = HomeService();
+    final homeService = HomeService();
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFBFD),
@@ -31,22 +31,20 @@ class CategoryProductsScreen extends StatelessWidget {
         elevation: 0,
       ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: homeService.getProducts(),
+        stream: homeService.getCategoryProducts(categoryId),
         builder: (context, snapshot) {
-          final products = (snapshot.data ?? [])
-              .where(
-                (p) =>
-                    p['categoryId']?.toString() == categoryId &&
-                    p['isAvailable'] != false,
-              )
-              .toList();
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
             return const Center(
               child: CircularProgressIndicator(color: AppColors.primary),
             );
           }
 
+          if (snapshot.hasError) {
+            return const Center(child: Text('تعذر تحميل المنتجات'));
+          }
+
+          final products = snapshot.data ?? const <Map<String, dynamic>>[];
           if (products.isEmpty) {
             return const Center(child: Text('لا توجد منتجات في هذا القسم'));
           }
@@ -60,13 +58,7 @@ class CategoryProductsScreen extends StatelessWidget {
               mainAxisSpacing: 14.h,
               childAspectRatio: .68,
             ),
-            itemBuilder: (_, index) {
-              final item = products[index];
-
-              return _ProductCard(
-                product: item,
-              );
-            },
+            itemBuilder: (_, index) => _ProductCard(product: products[index]),
           );
         },
       ),
@@ -76,10 +68,7 @@ class CategoryProductsScreen extends StatelessWidget {
 
 class _ProductCard extends StatelessWidget {
   final Map<String, dynamic> product;
-
-  const _ProductCard({
-    required this.product,
-  });
+  const _ProductCard({required this.product});
 
   @override
   Widget build(BuildContext context) {
@@ -88,17 +77,11 @@ class _ProductCard extends StatelessWidget {
     final price = product['price']?.toString() ?? '0';
     final oldPrice = product['oldPrice']?.toString() ?? '';
     final image = product['image']?.toString() ?? '';
-
     final hasOldPrice = oldPrice.trim().isNotEmpty && oldPrice != '0';
 
     return InkWell(
       borderRadius: BorderRadius.circular(28.r),
-      onTap: () {
-        context.push(
-          AppRoutes.productDetails,
-          extra: product,
-        );
-      },
+      onTap: () => context.push(AppRoutes.productDetails, extra: product),
       child: Container(
         padding: EdgeInsets.all(12.w),
         decoration: BoxDecoration(
@@ -122,12 +105,10 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
             SizedBox(height: 10.h),
-            Text(
-              brand,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 11.sp, color: Colors.grey),
-            ),
+            Text(brand,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11.sp, color: Colors.grey)),
             SizedBox(height: 4.h),
             Text(
               name,
@@ -152,23 +133,19 @@ class _ProductCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '$price جنيه',
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (hasOldPrice)
-                      Text(
-                        '$oldPrice جنيه',
+                    Text('$price جنيه',
                         style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 11.sp,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
+                          color: AppColors.primary,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w900,
+                        )),
+                    if (hasOldPrice)
+                      Text('$oldPrice جنيه',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 11.sp,
+                            decoration: TextDecoration.lineThrough,
+                          )),
                   ],
                 ),
               ],
@@ -182,29 +159,40 @@ class _ProductCard extends StatelessWidget {
 
 class _SmartImage extends StatelessWidget {
   final String image;
-
   const _SmartImage({required this.image});
 
   @override
   Widget build(BuildContext context) {
-    if (image.isEmpty) return _fallback();
+    final value = image.trim();
+    if (value.isEmpty) return _fallback();
 
-    if (image.startsWith('data:image')) {
+    if (value.startsWith('data:image') || value.length > 250) {
       try {
-        final bytes = base64Decode(image.split(',').last);
+        final raw = value.contains(',') ? value.split(',').last : value;
         return Image.memory(
-          bytes,
+          base64Decode(raw),
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
+          errorBuilder: (_, __, ___) => _fallback(),
         );
       } catch (_) {
         return _fallback();
       }
     }
 
-    return Image.network(
-      image,
+    if (value.startsWith('http')) {
+      return Image.network(
+        value,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _fallback(),
+      );
+    }
+
+    return Image.asset(
+      value,
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
@@ -212,12 +200,9 @@ class _SmartImage extends StatelessWidget {
     );
   }
 
-  Widget _fallback() {
-    return Container(
-      color: AppColors.softPink,
-      child: const Center(
-        child: Icon(Icons.image, color: AppColors.primary),
-      ),
-    );
-  }
+  Widget _fallback() => Container(
+        color: AppColors.softPink,
+        alignment: Alignment.center,
+        child: const Icon(Icons.image, color: AppColors.primary),
+      );
 }

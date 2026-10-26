@@ -9,93 +9,24 @@ class AppCachedImage extends StatelessWidget {
   final String image;
   final BoxFit fit;
   final IconData icon;
-
-  const AppCachedImage({
-    super.key,
-    required this.image,
-    this.fit = BoxFit.cover,
-    this.icon = Icons.image_rounded,
-  });
-
+  final String? fallbackKey;
+  const AppCachedImage({super.key, required this.image, this.fit = BoxFit.cover, this.icon = Icons.image_rounded, this.fallbackKey});
   @override
   Widget build(BuildContext context) {
     final cleanImage = image.trim();
-
-    if (cleanImage.isEmpty) {
-      return _fallback();
-    }
-
-    if (cleanImage.startsWith('http')) {
-      return CachedNetworkImage(
-        imageUrl: cleanImage,
-        fit: fit,
-        width: double.infinity,
-        height: double.infinity,
-        placeholder: (_, __) => _loading(),
-        errorWidget: (_, __, ___) => _fallback(),
-      );
-    }
-
-    if (cleanImage.startsWith('data:image')) {
-      try {
-        final base64String = cleanImage.split(',').last;
-        final bytes = base64Decode(base64String);
-
-        return Image.memory(
-          bytes,
-          fit: fit,
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (_, __, ___) => _fallback(),
-        );
-      } catch (_) {
-        return _fallback();
-      }
-    }
-
+    if (cleanImage.isEmpty) return _fallback();
+    if (cleanImage.startsWith('http')) return CachedNetworkImage(imageUrl: cleanImage, fit: fit, width: double.infinity, height: double.infinity, placeholder: (_, __) => _loading(), errorWidget: (_, __, ___) => _fallback());
     try {
-      final bytes = base64Decode(cleanImage);
-
-      return Image.memory(
-        bytes,
-        fit: fit,
-        width: double.infinity,
-        height: double.infinity,
-        errorBuilder: (_, __, ___) => _fallback(),
-      );
-    } catch (_) {
-      return _fallback();
-    }
+      final source = cleanImage.startsWith('data:image') ? cleanImage.split(',').last : cleanImage;
+      return Image.memory(base64Decode(source), fit: fit, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => _fallback());
+    } catch (_) { return _fallback(); }
   }
-
-  Widget _loading() {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: AppColors.softPink.withOpacity(.45),
-      child: Center(
-        child: SizedBox(
-          width: 22.w,
-          height: 22.w,
-          child: const CircularProgressIndicator(
-            strokeWidth: 2,
-            color: AppColors.primary,
-          ),
-        ),
-      ),
-    );
+  Widget _loading() => Container(width: double.infinity, height: double.infinity, color: AppColors.softPink.withOpacity(.45), child: Center(child: SizedBox(width: 22.w, height: 22.w, child: const CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))));
+  String _fallbackAsset() {
+    final key = (fallbackKey ?? '').toLowerCase();
+    if (key.contains('كريب') || key.contains('crepe')) return 'assets/images/default_crepe.jpg';
+    if (key.contains('فرايد') || key.contains('تشيكن') || key.contains('فراخ') || key.contains('استربس') || key.contains('زنجر') || key.contains('بانيه') || key.contains('كرانشي') || key.contains('chicken')) return 'assets/images/default_fried_chicken.jpg';
+    return 'assets/images/default_sandwich.jpg';
   }
-
-  Widget _fallback() {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: AppColors.softPink,
-      child: Icon(
-        icon,
-        color: AppColors.primary,
-        size: 28.sp,
-      ),
-    );
-  }
+  Widget _fallback() => Image.asset(_fallbackAsset(), fit: fit, width: double.infinity, height: double.infinity, errorBuilder: (_, __, ___) => Container(width: double.infinity, height: double.infinity, color: AppColors.softPink, child: Icon(icon, color: AppColors.primary, size: 28.sp)));
 }

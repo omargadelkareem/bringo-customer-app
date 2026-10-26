@@ -1,0 +1,29 @@
+name: Fix store type compatibility
+
+on:
+  push:
+    branches:
+      - fix/home-scroll-banner-jank
+    paths:
+      - .github/workflows/fix-store-type-compat.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/home-scroll-banner-jank
+      - name: Patch restaurant compatibility
+        run: |
+          python3 -c "from pathlib import Path; p=Path('lib/features/home/category_stores_screen.dart'); s=p.read_text(); old=\"        final type = store['type']?.toString().trim().toLowerCase() ?? '';\\n\\n        if (type != widget.storeType.toLowerCase()) return;\"; new=\"        final requestedType = widget.storeType.trim().toLowerCase();\\n        final type = store['type']?.toString().trim().toLowerCase() ?? '';\\n        final category = store['category']?.toString().trim().toLowerCase() ?? '';\\n        final categoryId = store['categoryId']?.toString().trim().toLowerCase() ?? '';\\n        final values = {type, category, categoryId};\\n        const restaurantAliases = {'restaurant', 'restaurants', 'food', 'foods', 'مطعم', 'مطاعم'};\\n        final matchesType = requestedType == 'restaurant'\\n            ? values.any(restaurantAliases.contains)\\n            : values.contains(requestedType);\\n        if (!matchesType) return;\"; assert old in s, 'Target code not found'; p.write_text(s.replace(old,new,1))"
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/features/home/category_stores_screen.dart
+          git commit -m "fix(stores): support legacy restaurant values" || exit 0
+          git push origin HEAD:fix/home-scroll-banner-jank
