@@ -272,6 +272,12 @@ class _SupermarketStoreDetailsScreenState
         backgroundColor: const Color(0xFFFFFBFD),
         body: StreamBuilder<DatabaseEvent>(
           stream: FirebaseDatabase.instance
+              .ref('catalogProducts')
+              .onValue,
+          builder: (context, catalogSnapshot) {
+            final catalog = catalogSnapshot.data?.snapshot.value;
+            return StreamBuilder<DatabaseEvent>(
+          stream: FirebaseDatabase.instance
               .ref('products')
               .orderByChild('storeId')
               .equalTo(storeId)
@@ -281,9 +287,25 @@ class _SupermarketStoreDetailsScreenState
                 snapshot.connectionState == ConnectionState.waiting &&
                     !snapshot.hasData;
 
-            final allProducts = _parseProducts(
+            final rawProducts = _parseProducts(
               snapshot.data?.snapshot.value,
             );
+            // Keep the merchant's price, stock and availability unchanged.
+            // Only use an approved catalog photo when the merchant has no image
+            // and the product explicitly references that catalog entry.
+            final catalogMap = catalog is Map ? catalog : const {};
+            final allProducts = rawProducts.map((product) {
+              final currentImage = product['image']?.toString().trim() ?? '';
+              final catalogId = product['catalogProductId']?.toString().trim() ?? '';
+              if (currentImage.isNotEmpty || catalogId.isEmpty) return product;
+              final entry = catalogMap[catalogId];
+              if (entry is! Map || entry['imageStatus'] != 'approved') {
+                return product;
+              }
+              final url = entry['imageUrl']?.toString().trim() ?? '';
+              if (!url.startsWith('https://')) return product;
+              return {...product, 'image': url};
+            }).toList();
 
             final categories = _buildCategories(allProducts);
 
@@ -376,6 +398,8 @@ class _SupermarketStoreDetailsScreenState
                   ),
               ],
             );
+          },
+        );
           },
         ),
       ),
