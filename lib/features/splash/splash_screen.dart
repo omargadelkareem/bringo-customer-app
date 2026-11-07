@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:bringo/core/routing/app_routes.dart';
-import 'package:bringo/core/services/auth_db_services.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,7 +13,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final AuthDbService _authService = AuthDbService();
+  final GetStorage _box = GetStorage();
 
   @override
   void initState() {
@@ -22,11 +22,8 @@ class _SplashScreenState extends State<SplashScreen> {
     Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
 
-      if (_authService.isLoggedIn) {
-        context.go(AppRoutes.mainLayout);
-      } else {
-        context.go(AppRoutes.onboarding);
-      }
+      final seenOnboarding = _box.read('onboardingCompleted') == true;
+      context.go(seenOnboarding ? AppRoutes.mainLayout : AppRoutes.onboarding);
     });
   }
 
