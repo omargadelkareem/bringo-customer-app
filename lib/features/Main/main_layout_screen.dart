@@ -7,6 +7,8 @@ import 'package:bringo/features/profile/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:go_router/go_router.dart';
+import 'package:bringo/core/routing/app_routes.dart';
 
 class MainLayoutScreen extends StatefulWidget {
   const MainLayoutScreen({super.key});
@@ -38,10 +40,32 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
   }
 
   void changeTab(int index) {
+    final userId = _box.read('userId')?.toString().trim() ?? '';
+    if (index == 2 && userId.isEmpty) {
+      _showLoginPrompt();
+      return;
+    }
     if (currentIndex == index) return;
     setState(() {
       currentIndex = index;
     });
+  }
+
+  Future<void> _showLoginPrompt() async {
+    final login = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('طلباتي'),
+        content: const Text('سجل دخولك علشان تتابع طلباتك وتعرف حالتها.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('لاحقًا')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('تسجيل الدخول')),
+        ],
+      ),
+    );
+    if (login == true && mounted) context.push(AppRoutes.login);
   }
 
   @override
