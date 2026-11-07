@@ -33,6 +33,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // Keep the last successful feed in memory when navigating between tabs.
+  static List<Map<String, dynamic>> _lastStores = const [];
+  static List<Map<String, dynamic>> _lastCategories = const [];
   final HomeService homeService = HomeService();
   final NotificationService notificationService = NotificationService();
   final GetStorage box = GetStorage();
@@ -40,15 +43,15 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<List<Map<String, dynamic>>>? _categoriesSubscription;
   StreamSubscription<DatabaseEvent>? _storesSubscription;
 
-  List<Map<String, dynamic>> _categories = const [];
-  List<Map<String, dynamic>> _stores = const [];
+  List<Map<String, dynamic>> _categories = _lastCategories;
+  List<Map<String, dynamic>> _stores = _lastStores;
   List<Map<String, dynamic>> _newestStores = const [];
   List<Map<String, dynamic>> _nearbyStores = const [];
 
-  bool _categoriesLoading = true;
-  bool _storesLoading = true;
-  bool isLoadingLocation = true;
-  String locationText = 'جاري تحديد موقعك...';
+  bool _categoriesLoading = _lastCategories.isEmpty;
+  bool _storesLoading = _lastStores.isEmpty;
+  bool isLoadingLocation = false;
+  String locationText = 'موقعك الحالي';
 
   String get _currentUserId =>
       (box.read('userId') ?? box.read('uid') ?? box.read('id'))
@@ -65,11 +68,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    final cachedLocation = box.read('currentLocationName')?.toString().trim() ?? '';
+    locationText = cachedLocation.isNotEmpty ? cachedLocation : 'حدد موقع التوصيل';
+    _rebuildStoreCaches();
 
     _categoriesSubscription = homeService.getCategories().listen((items) {
       if (!mounted) return;
       setState(() {
         _categories = _getCategories(items);
+        _lastCategories = _categories;
         _categoriesLoading = false;
       });
     }, onError: (_) {
@@ -82,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!mounted) return;
         setState(() {
           _stores = stores;
+          _lastStores = stores;
           _storesLoading = false;
           _rebuildStoreCaches();
         });
@@ -91,7 +99,10 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
 
-    _loadLocation();
+    // Location permissions and reverse geocoding must not block the first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadLocation();
+    });
   }
 
   @override
@@ -188,17 +199,19 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final newest = _stores.map(Map<String, dynamic>.from).toList()
+    final newest = List<Map<String, dynamic>>.of(_stores)
       ..sort((a, b) => NumberHelper.toInt(b['createdAt'])
           .compareTo(NumberHelper.toInt(a['createdAt'])));
     _newestStores = newest.take(10).toList(growable: false);
 
     final userLat = double.tryParse(box.read('currentLatitude')?.toString() ?? '');
     final userLng = double.tryParse(box.read('currentLongitude')?.toString() ?? '');
-    final nearby = _stores.map(Map<String, dynamic>.from).toList();
+    final nearby = List<Map<String, dynamic>>.of(_stores);
 
     if (userLat != null && userLng != null) {
-      for (final store in nearby) {
+      for (var i = 0; i < nearby.length; i++) {
+        final store = Map<String, dynamic>.of(nearby[i]);
+        nearby[i] = store;
         final lat = _storeLatitude(store);
         final lng = _storeLongitude(store);
         if (lat != null && lng != null) {
@@ -223,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: const Color(0xFFFFFBFD),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        cacheExtent: 650,
+        cacheExtent: 250,
         slivers: [
           SliverToBoxAdapter(child: RepaintBoundary(child: _appBar())),
           SliverToBoxAdapter(child: SizedBox(height: 12.h)),
