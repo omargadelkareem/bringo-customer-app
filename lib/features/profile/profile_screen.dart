@@ -7,6 +7,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:go_router/go_router.dart';
 
 class ProfileScreen extends StatelessWidget {
+  static final ValueNotifier<int> logoutRevision = ValueNotifier<int>(0);
   ProfileScreen({super.key});
 
   final GetStorage box = GetStorage();
@@ -260,7 +261,9 @@ class ProfileScreen extends StatelessWidget {
     final onboardingCompleted = box.read('onboardingCompleted') == true;
     await box.erase();
     await box.write('onboardingCompleted', onboardingCompleted);
-    if (context.mounted) context.go('/main-layout');
+    logoutRevision.value++;
+    // The parent IndexedStack listens and selects Home, even if the route
+    // is already /main-layout (where context.go would be a no-op).
   }
 }
 
