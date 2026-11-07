@@ -34,7 +34,7 @@ class DeliveryZoneQuote {
 
 class DeliveryZoneService {
   DeliveryZoneService._();
-  static const double pricePerKm = 8;
+  static const double pricePerKm = 11;
   static const double minimumFee = 25;
   static const zones = <DeliveryZone>[
     DeliveryZone(id: 'sohag_east', name: 'شرق سوهاج'),
