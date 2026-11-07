@@ -1,5 +1,7 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:bringo/core/routing/app_routes.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -100,8 +102,21 @@ class OrderTrackingScreen extends StatelessWidget {
     await launchUrl(Uri.parse('https://wa.me/$number?text=$text'), mode: LaunchMode.externalApplication);
   }
 
+  void _backToApp(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.mainLayout);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => Directionality(
+  Widget build(BuildContext context) => PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, result) {
+      if (!didPop) _backToApp(context);
+    },
+    child: Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
       backgroundColor: canvas,
@@ -111,7 +126,7 @@ class OrderTrackingScreen extends StatelessWidget {
         elevation: 0,
         toolbarHeight: 70.h,
         leading: IconButton(
-          onPressed: () => Navigator.maybePop(context),
+          onPressed: () => _backToApp(context),
           icon: Container(
             padding: EdgeInsets.all(9.w),
             decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: line)),
@@ -166,7 +181,7 @@ class OrderTrackingScreen extends StatelessWidget {
         },
       ),
     ),
-  );
+  ));
 
   Widget _hero(String status, double total) {
     final cancelled = status == 'cancelled';
