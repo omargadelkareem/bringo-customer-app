@@ -1,9 +1,11 @@
 import 'package:bringo/core/models/user_models.dart';
 import 'package:bringo/core/services/push_notification_service.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get_storage/get_storage.dart';
 
 class AuthDbService {
+  static final ValueNotifier<int> sessionRevision = ValueNotifier<int>(0);
   final DatabaseReference _usersRef = FirebaseDatabase.instance.ref('users');
   final GetStorage _box = GetStorage();
 
@@ -82,6 +84,7 @@ class AuthDbService {
     await _box.write('name', user.name);
     await _box.write('phone', user.phone);
     await _box.write('address', user.address);
+    sessionRevision.value++;
   }
 
   Future<void> saveUserId(String userId) async {
@@ -98,5 +101,6 @@ class AuthDbService {
     await _box.remove(userIdKey);
     await _box.remove(accountNameKey);
     await _box.remove(accountPhoneKey);
+    sessionRevision.value++;
   }
 }
