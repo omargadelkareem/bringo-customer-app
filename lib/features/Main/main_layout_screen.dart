@@ -17,7 +17,6 @@ class MainLayoutScreen extends StatefulWidget {
 
 class _MainLayoutScreenState extends State<MainLayoutScreen> {
   int currentIndex = 0;
-  bool _welcomeVisible = true;
   final GetStorage _box = GetStorage();
 
   final List<Widget> pages = [
@@ -42,7 +41,6 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
     if (currentIndex == index) return;
     setState(() {
       currentIndex = index;
-      if (index == 0) _welcomeVisible = true;
     });
   }
 
@@ -50,21 +48,7 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9F8),
-      body: Stack(
-        children: [
-          IndexedStack(index: currentIndex, children: pages),
-          if (currentIndex == 0 && _welcomeVisible)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 66.h,
-              right: 14.w,
-              left: 14.w,
-              child: _WelcomeBanner(
-                name: _customerName,
-                onClose: () => setState(() => _welcomeVisible = false),
-              ),
-            ),
-        ],
-      ),
+      body: IndexedStack(index: currentIndex, children: pages),
       bottomNavigationBar: _buildBottomNavigation(),
     );
   }
