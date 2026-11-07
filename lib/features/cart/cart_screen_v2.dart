@@ -123,6 +123,26 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<void> _placeOrder(List<Map<String, dynamic>> items) async {
     if (items.isEmpty || placingOrder) return;
+    final sessionId = GetStorage().read('userId')?.toString().trim() ?? '';
+    if (sessionId.isEmpty) {
+      if (!mounted) return;
+      final shouldLogin = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('سجل دخولك لإتمام الطلب'),
+          content: const Text('تقدر تتصفح برينجو وتضيف للسلة من غير حساب. لتأكيد الطلب، سجل دخولك أو أنشئ حساب جديد. السلة هتفضل محفوظة.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('متابعة التسوق')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('تسجيل الدخول')),
+          ],
+        ),
+      );
+      if (shouldLogin == true && mounted) context.push(AppRoutes.login);
+      return;
+    }
+
     final name = nameController.text.trim().isNotEmpty ? nameController.text.trim() : customerName;
     final phone = phoneController.text.trim().isNotEmpty ? phoneController.text.trim() : customerPhone;
     if (phone.isEmpty) return _message('اكتب رقم الهاتف');
