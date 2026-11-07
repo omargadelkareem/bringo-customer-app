@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'order_status_notification_service.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -64,6 +66,8 @@ class PushNotificationService {
       _tokenSubscription = _messaging.onTokenRefresh.listen((token) async {
         if (token.isNotEmpty) await _saveToken(token);
       });
+
+      await OrderStatusNotificationService.start();
 
       await _foregroundSubscription?.cancel();
       _foregroundSubscription = FirebaseMessaging.onMessage.listen(
@@ -141,6 +145,7 @@ class PushNotificationService {
     try {
       final token = await _messaging.getToken();
       if (token != null && token.isNotEmpty) await _saveToken(token);
+      await OrderStatusNotificationService.start();
     } catch (error) {
       // ignore: avoid_print
       print('PushNotificationService.syncForCurrentUser error: $error');
