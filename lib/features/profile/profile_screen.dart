@@ -24,6 +24,7 @@ class ProfileScreen extends StatelessWidget {
     final legacyName = box.read('userName')?.toString().trim() ?? '';
     final phone = box.read('accountPhone')?.toString().trim() ?? '';
     final name = accountName.isNotEmpty ? accountName : legacyName.isNotEmpty ? legacyName : 'عميل برينجو';
+    final isGuest = (box.read('userId')?.toString().trim() ?? '').isEmpty;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -34,16 +35,16 @@ class ProfileScreen extends StatelessWidget {
             physics: const BouncingScrollPhysics(),
             padding: EdgeInsets.only(bottom: 110.h),
             children: [
-              _hero(context, name, phone),
+              if (isGuest) _guestHeader(context) else _hero(context, name, phone),
               SizedBox(height: 28.h),
               _sectionTitle('إدارة الحساب'),
-              _group(context, [
+              if (!isGuest) _group(context, [
                 _ProfileItem(Icons.person_outline_rounded, 'المعلومات الشخصية', 'تعديل بيانات حسابك', const PersonalInfoScreen()),
                 _ProfileItem(Icons.location_on_outlined, 'عناويني', 'عناوين التوصيل المحفوظة', const AddressesScreen()),
               ]),
               SizedBox(height: 24.h),
               _sectionTitle('طلباتي'),
-              _group(context, [
+              if (!isGuest) _group(context, [
                 _ProfileItem(Icons.receipt_long_outlined, 'سجل الطلبات', 'تابع طلباتك السابقة والحالية', const MyOrdersScreen()),
               ]),
               SizedBox(height: 24.h),
@@ -55,7 +56,7 @@ class ProfileScreen extends StatelessWidget {
                 _ProfileItem(Icons.info_outline_rounded, 'عن برينجو', 'اعرف أكتر عن التطبيق', const AboutBringoScreen()),
               ]),
               SizedBox(height: 22.h),
-              _logoutTile(context),
+              if (!isGuest) _logoutTile(context),
               SizedBox(height: 24.h),
               Center(child: Text('Bringo  •  v1.0.0',
                   style: TextStyle(fontSize: 10.sp, color: _muted, fontWeight: FontWeight.w600))),
@@ -65,6 +66,33 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  Widget _guestHeader(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 0),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('حسابي', style: TextStyle(color: _ink, fontSize: 25.sp, fontWeight: FontWeight.w900)),
+      SizedBox(height: 20.h),
+      Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(20.w),
+        decoration: BoxDecoration(color: Colors.white,
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: const Color(0xFFE8EEEA))),
+        child: Column(children: [
+          Icon(Icons.account_circle_outlined, color: AppColors.primary, size: 50.sp),
+          SizedBox(height: 10.h),
+          Text('أهلاً بيك في برينجو', style: TextStyle(color: _ink, fontSize: 17.sp, fontWeight: FontWeight.w900)),
+          SizedBox(height: 7.h),
+          Text('تصفح براحتك، وسجل حساب علشان تطلب وتتابع طلباتك',
+            textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 12.sp)),
+          SizedBox(height: 16.h),
+          SizedBox(width: double.infinity, child: FilledButton(
+            onPressed: () => context.push('/login'),
+            child: const Text('تسجيل الدخول أو إنشاء حساب'))),
+        ]),
+      ),
+    ]),
+  );
 
   Widget _hero(BuildContext context, String name, String phone) {
     return Padding(
@@ -229,8 +257,10 @@ class ProfileScreen extends StatelessWidget {
     );
 
     if (confirm != true) return;
+    final onboardingCompleted = box.read('onboardingCompleted') == true;
     await box.erase();
-    if (context.mounted) context.go('/login');
+    await box.write('onboardingCompleted', onboardingCompleted);
+    if (context.mounted) context.go('/main-layout');
   }
 }
 
