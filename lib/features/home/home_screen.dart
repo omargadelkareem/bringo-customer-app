@@ -17,6 +17,7 @@ import 'package:bringo/core/widgets/app_skeleton.dart';
 import 'package:bringo/features/cart/cart_manager.dart';
 import 'package:bringo/features/cart/cart_screen.dart';
 import 'package:bringo/features/home/category_stores_screen.dart';
+import 'package:bringo/features/home/store_search_screen.dart';
 import 'package:bringo/features/notifications/notifications_screen.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
@@ -327,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               SizedBox(width: 8.w),
-              _appBarIcon(icon: Icons.search_rounded, onTap: () {}),
+              _appBarIcon(icon: Icons.search_rounded, onTap: _openSearch),
               SizedBox(width: 6.w),
               ValueListenableBuilder<List<Map<String, dynamic>>>(
                 valueListenable: CartManager.cartNotifier,
@@ -599,6 +600,14 @@ class _HomeScreenState extends State<HomeScreen> {
           storeType: storeType,
           title: name.isNotEmpty ? name : 'المتاجر',
         ),
+      ),
+    );
+  }
+
+  void _openSearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => StoreSearchScreen(stores: List.of(_stores)),
       ),
     );
   }
