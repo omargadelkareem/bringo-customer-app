@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:shimmer/shimmer.dart';
 
 
 
@@ -41,6 +42,38 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
   String searchQuery = '';
 
   int _productLimit = 30;
+  late Stream<List<Map<String, dynamic>>> _productsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _productsStream = _homeService.getStoreProducts(storeId, limit: _productLimit);
+  }
+
+  void _loadMoreProducts() {
+    setState(() {
+      _productLimit += 30;
+      _productsStream = _homeService.getStoreProducts(storeId, limit: _productLimit);
+    });
+  }
+
+  Widget _loadingSkeleton() => Column(children: [
+    _appBar(),
+    _storeInformation(),
+    Expanded(child: Shimmer.fromColors(
+      baseColor: const Color(0xFFE7ECEA),
+      highlightColor: const Color(0xFFF8FAF9),
+      child: ListView.builder(
+        padding: EdgeInsets.all(16.w),
+        itemCount: 6,
+        itemBuilder: (_, i) => Container(
+          margin: EdgeInsets.only(bottom: 12.h),
+          height: 104.h,
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16.r)),
+        ),
+      ),
+    )),
+  ]);
 
 
 
@@ -331,9 +364,7 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
 
             StreamBuilder<List<Map<String, dynamic>>>(
 
-                stream: _homeService.getStoreProducts(storeId,
-
-                    limit: _productLimit),
+                stream: _productsStream,
 
                 builder: (context, snapshot) {
 
@@ -341,19 +372,7 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
 
                       !snapshot.hasData)
 
-                    return Column(children: [
-
-                      _appBar(),
-
-                      const Expanded(
-
-                          child: Center(
-
-                              child: CircularProgressIndicator(
-
-                                  color: AppColors.primary)))
-
-                    ]);
+                    return _loadingSkeleton();
 
                   if (snapshot.hasError)
 
@@ -522,7 +541,7 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
 
                                       onPressed: () =>
 
-                                          setState(() => _productLimit += 30),
+                                          _loadMoreProducts(),
 
                                       icon:
 
