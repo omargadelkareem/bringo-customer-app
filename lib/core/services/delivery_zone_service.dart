@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:firebase_database/firebase_database.dart';
 
@@ -10,18 +12,20 @@ class DeliveryZoneQuote {
   final String storeZoneId, customerZoneId, storeZoneName, customerZoneName;
   final double deliveryFee, distanceKm, pricePerKm, minimumFee;
   final double storeLatitude, storeLongitude;
+  final String distanceCalculation;
   const DeliveryZoneQuote({
     required this.storeZoneId, required this.customerZoneId,
     required this.storeZoneName, required this.customerZoneName,
     required this.deliveryFee, required this.distanceKm,
     required this.pricePerKm, required this.minimumFee,
     required this.storeLatitude, required this.storeLongitude,
+    required this.distanceCalculation,
   });
   double get bringoShare => double.parse((deliveryFee / 3).toStringAsFixed(2));
   double get driverShare => double.parse((deliveryFee - bringoShare).toStringAsFixed(2));
   Map<String, dynamic> toOrderMap() => {
     'pricingType': 'distance', 'deliveryPricingType': 'distance',
-    'distanceCalculation': 'straight_line_estimate',
+    'distanceCalculation': distanceCalculation,
     'deliveryDistanceKm': distanceKm, 'deliveryPricePerKm': pricePerKm,
     'deliveryMinimumFee': minimumFee, 'storeLatitude': storeLatitude,
     'storeLongitude': storeLongitude,
@@ -75,14 +79,44 @@ class DeliveryZoneService {
     return (lat, lng);
   }
 
-  static double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
-    const radius = 6371.0;
-    double rad(double degrees) => degrees * math.pi / 180;
-    final dLat = rad(lat2 - lat1), dLon = rad(lon2 - lon1);
-    final a = math.pow(math.sin(dLat / 2), 2) +
-        math.cos(rad(lat1)) * math.cos(rad(lat2)) *
-        math.pow(math.sin(dLon / 2), 2);
-    return radius * 2 * math.asin(math.sqrt(a.clamp(0.0, 1.0)));
+  // OSRM's public demo server is for development/testing only.
+  // Production should use a dedicated routing service or hosted OSRM.
+  static Future<double> _roadDistanceKm({
+    required double storeLat,
+    required double storeLng,
+    required double customerLat,
+    required double customerLng,
+  }) async {
+    final uri = Uri.https('router.project-osrm.org',
+      '/route/v1/driving/$storeLng,$storeLat;$customerLng,$customerLat',
+      {'overview': 'false', 'steps': 'false'});
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+    try {
+      final request = await client.getUrl(uri).timeout(const Duration(seconds: 12));
+      final response = await request.close().timeout(const Duration(seconds: 12));
+      if (response.statusCode != HttpStatus.ok) {
+        throw StateError('خدمة حساب الطريق غير متاحة حاليًا');
+      }
+      final body = await utf8.decoder.bind(response).join().timeout(const Duration(seconds: 12));
+      final data = jsonDecode(body);
+      if (data is! Map || data['code'] != 'Ok' || data['routes'] is! List ||
+          (data['routes'] as List).isEmpty) {
+        throw StateError('لم يتم العثور على طريق بين المتجر وموقع التوصيل');
+      }
+      final meters = (data['routes'][0]['distance'] as num?)?.toDouble();
+      if (meters == null || !meters.isFinite || meters <= 0) {
+        throw StateError('تعذر التحقق من مسافة الطريق');
+      }
+      return meters / 1000;
+    } on SocketException {
+      throw StateError('تعذر الاتصال بخدمة حساب الطريق. حاول مجددًا');
+    } on HandshakeException {
+      throw StateError('تعذر الاتصال الآمن بخدمة حساب الطريق');
+    } on FormatException {
+      throw StateError('استجابة خدمة حساب الطريق غير صالحة');
+    } finally {
+      client.close(force: true);
+    }
   }
 
   static Future<DeliveryZoneQuote> quoteForCoordinates({
@@ -95,8 +129,11 @@ class DeliveryZoneService {
       throw StateError('موقع العميل غير صحيح');
     }
     final (storeLat, storeLng) = await _storeCoordinates(storeId);
-    // This is a straight-line estimate, NOT road-routing distance.
-    final distance = _haversineKm(storeLat, storeLng, latitude, longitude);
+    // Never silently fall back to straight-line pricing on routing failure.
+    final distance = await _roadDistanceKm(
+      storeLat: storeLat, storeLng: storeLng,
+      customerLat: latitude, customerLng: longitude,
+    );
     final fee = math.max(minimumFee, (distance * pricePerKm).ceilToDouble());
     return DeliveryZoneQuote(
       storeZoneId: '', customerZoneId: '',
@@ -104,6 +141,7 @@ class DeliveryZoneService {
       deliveryFee: fee, distanceKm: double.parse(distance.toStringAsFixed(2)),
       pricePerKm: pricePerKm, minimumFee: minimumFee,
       storeLatitude: storeLat, storeLongitude: storeLng,
+      distanceCalculation: 'road_route_osrm',
     );
   }
 }
