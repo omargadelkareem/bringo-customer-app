@@ -21,6 +21,23 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
   int currentIndex = 0;
   final GetStorage _box = GetStorage();
 
+  @override
+  void initState() {
+    super.initState();
+    ProfileScreen.logoutRevision.addListener(_handleLogout);
+  }
+
+  void _handleLogout() {
+    if (!mounted) return;
+    setState(() => currentIndex = 0);
+  }
+
+  @override
+  void dispose() {
+    ProfileScreen.logoutRevision.removeListener(_handleLogout);
+    super.dispose();
+  }
+
   final List<Widget> pages = [
     const HomeScreen(),
     const CartScreen(),
