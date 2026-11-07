@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:get_storage/get_storage.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -54,16 +55,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  void _skip() {
+  Future<void> _skip() async {
     HapticFeedback.lightImpact();
-    context.go(AppRoutes.login);
+    await GetStorage().write('onboardingCompleted', true);
+    if (mounted) context.go(AppRoutes.mainLayout);
   }
 
   Future<void> _next() async {
     HapticFeedback.selectionClick();
 
     if (isLastPage) {
-      context.go(AppRoutes.login);
+      await GetStorage().write('onboardingCompleted', true);
+      if (mounted) context.go(AppRoutes.mainLayout);
       return;
     }
 
