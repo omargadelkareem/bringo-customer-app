@@ -1,4 +1,5 @@
 import 'package:bringo/core/constant/app_colors.dart';
+import 'package:bringo/core/services/auth_db_services.dart';
 import 'package:bringo/features/cart/cart_manager.dart';
 import 'package:bringo/features/cart/cart_screen.dart';
 import 'package:bringo/features/home/home_screen.dart';
@@ -25,6 +26,7 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
   void initState() {
     super.initState();
     ProfileScreen.logoutRevision.addListener(_handleLogout);
+    AuthDbService.sessionRevision.addListener(_handleSessionChange);
   }
 
   void _handleLogout() {
@@ -32,13 +34,18 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
     setState(() => currentIndex = 0);
   }
 
+  void _handleSessionChange() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    AuthDbService.sessionRevision.removeListener(_handleSessionChange);
     ProfileScreen.logoutRevision.removeListener(_handleLogout);
     super.dispose();
   }
 
-  final List<Widget> pages = [
+  List<Widget> get pages => [
     const HomeScreen(),
     const CartScreen(),
     const MyOrdersScreen(),
