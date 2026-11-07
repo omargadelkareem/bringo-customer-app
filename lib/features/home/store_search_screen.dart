@@ -47,13 +47,13 @@ class _StoreSearchScreenState extends State<StoreSearchScreen> {
   static String _normalize(String text) => text
       .trim()
       .toLowerCase()
-      .replaceAll(RegExp('[\\u064B-\\u065F\\u0670\\u0640]'), '')
+      .replaceAll(RegExp('[ً-ٰٟـ]'), '')
       .replaceAll(RegExp('[أإآٱ]'), 'ا')
       .replaceAll('ة', 'ه')
       .replaceAll('ى', 'ي')
       .replaceAll('ؤ', 'و')
       .replaceAll('ئ', 'ي')
-      .replaceAll(RegExp(r'\\s+'), ' ');
+      .replaceAll(RegExp(r'\s+'), ' ');
 
   void _onChanged(String value) {
     _debounce?.cancel();
