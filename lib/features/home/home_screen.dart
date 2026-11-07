@@ -3,6 +3,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
+
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:bringo/core/constant/app_colors.dart';
 import 'package:bringo/core/routing/app_routes.dart';
@@ -955,6 +958,8 @@ class _StoreCard extends StatelessWidget {
 }
 
 class _AdaptiveImage extends StatelessWidget {
+  static final Map<String, Uint8List> _decodedImages = {};
+  static const int _maxCachedImages = 24;
   final String value;
   final IconData fallbackIcon;
 
@@ -965,12 +970,16 @@ class _AdaptiveImage extends StatelessWidget {
     final image = value.trim();
     if (image.isEmpty) return _placeholder();
     if (image.startsWith('http')) {
-      return Image.network(
-        image,
+      return CachedNetworkImage(
+        imageUrl: image,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        errorBuilder: (_, __, ___) => _placeholder(),
+        memCacheWidth: 480,
+        maxWidthDiskCache: 720,
+        fadeInDuration: const Duration(milliseconds: 120),
+        placeholder: (_, __) => _placeholder(),
+        errorWidget: (_, __, ___) => _placeholder(),
       );
     }
     if (image.startsWith('assets/')) {
@@ -984,8 +993,16 @@ class _AdaptiveImage extends StatelessWidget {
     }
     try {
       final clean = image.startsWith('data:image') ? image.split(',').last : image;
+      var bytes = _decodedImages[clean];
+      if (bytes == null) {
+        bytes = base64Decode(clean);
+        if (_decodedImages.length >= _maxCachedImages) {
+          _decodedImages.remove(_decodedImages.keys.first);
+        }
+        _decodedImages[clean] = bytes;
+      }
       return Image.memory(
-        base64Decode(clean),
+        bytes,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
