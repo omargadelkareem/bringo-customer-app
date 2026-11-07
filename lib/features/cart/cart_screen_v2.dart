@@ -40,6 +40,7 @@ class _CartScreenState extends State<CartScreen> {
   bool loadingLocation = true;
   bool placingOrder = false;
   bool loadingQuote = false;
+  String? deliveryQuoteError;
   DeliveryZoneQuote? deliveryQuote;
 
   double get deliveryFee => deliveryQuote?.deliveryFee ?? 0;
@@ -74,7 +75,7 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _loadLocation() async {
-    if (mounted) setState(() { loadingLocation = true; deliveryQuote = null; });
+    if (mounted) setState(() { loadingLocation = true; deliveryQuote = null; deliveryQuoteError = null; });
     try {
       final location = await LocationService().getCurrentLocation().timeout(const Duration(seconds: 18));
       if (location == null || location.latitude == null || location.longitude == null) throw StateError('location_unavailable');
@@ -92,8 +93,9 @@ class _CartScreenState extends State<CartScreen> {
         deliveryQuote = quote;
         await box.write('deliveryZoneId', quote.customerZoneId);
       }
-    } catch (_) {
-      detectedAddress = 'تعذر تحديد موقعك تلقائيًا - حدّث الموقع للمحاولة مرة أخرى';
+    } catch (error) {
+      deliveryQuoteError = error.toString().replaceFirst('Bad state: ', '');
+      detectedAddress = 'تعذر حساب التوصيل - راجع موقع العميل والمتجر';
       deliveryQuote = null;
       customerZoneId = null;
     } finally {
@@ -173,7 +175,7 @@ class _CartScreenState extends State<CartScreen> {
           return {'id': item['id']?.toString() ?? '', 'productId': item['id']?.toString() ?? '', 'name': item['name']?.toString() ?? '', 'image': item['image']?.toString() ?? '', 'price': price, 'quantity': quantity, 'total': price * quantity, 'storeId': CartManager.storeId};
         }).toList(),
         'subtotal': subtotal, ...quote.toOrderMap(),
-        'deliveryPricing': {'type': 'zone', 'storeZoneId': quote.storeZoneId, 'storeZoneName': quote.storeZoneName, 'customerZoneId': quote.customerZoneId, 'customerZoneName': quote.customerZoneName, 'fee': quote.deliveryFee},
+        'deliveryPricing': {'type': 'distance', 'calculation': 'straight_line_estimate', 'distanceKm': quote.distanceKm, 'pricePerKm': quote.pricePerKm, 'minimumFee': quote.minimumFee, 'fee': quote.deliveryFee},
         'total': subtotal + quote.deliveryFee, 'paymentMethod': 'cash', 'paymentStatus': 'unpaid',
         'status': 'pending_provider', 'orderStatus': 'pending_provider', 'driverId': '', 'driverKey': '', 'driverName': '', 'driverPhone': '',
         'estimatedDeliveryMinutes': 25, 'createdAt': ServerValue.timestamp, 'updatedAt': ServerValue.timestamp,
@@ -299,7 +301,7 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _row(String title, double value, {bool bold = false, bool deliveryRow = false}) => Row(children: [
     Text(title, style: TextStyle(fontSize: bold ? 15.sp : 13.sp, fontWeight: bold ? FontWeight.w900 : FontWeight.w600, color: bold ? AppColors.dark : AppColors.textSecondary)), const Spacer(),
-    Text(deliveryRow && deliveryQuote == null ? (loadingQuote || loadingLocation ? 'جاري الحساب...' : 'حدّث الموقع') : '${value.toStringAsFixed(0)} جنيه', style: TextStyle(fontSize: bold ? 17.sp : 13.sp, fontWeight: FontWeight.w900, color: bold ? AppColors.primary : AppColors.dark)),
+    Text(deliveryRow && deliveryQuote == null ? (loadingQuote || loadingLocation ? 'جاري الحساب...' : 'تعذر الحساب') : '${value.toStringAsFixed(0)} جنيه', style: TextStyle(fontSize: bold ? 17.sp : 13.sp, fontWeight: FontWeight.w900, color: bold ? AppColors.primary : AppColors.dark)),
   ]);
 
   Widget _bottomBar(List<Map<String, dynamic>> items, double subtotal) => Container(
@@ -307,7 +309,7 @@ class _CartScreenState extends State<CartScreen> {
     child: SafeArea(top: false, child: SizedBox(height: 56.h, child: ElevatedButton(
       onPressed: placingOrder || loadingLocation || loadingQuote || deliveryQuote == null ? null : () => _checkoutSheet(items),
       style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r))),
-      child: Row(children: [Text(deliveryQuote == null ? 'جاري حساب التوصيل' : '${(subtotal + deliveryFee).toStringAsFixed(0)} جنيه', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900)), const Spacer(), Text('إتمام الطلب', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900)), SizedBox(width: 6.w), const Icon(Icons.arrow_back_rounded)]),
+      child: Row(children: [Text(deliveryQuote == null ? (deliveryQuoteError ?? 'جاري حساب التوصيل') : '${(subtotal + deliveryFee).toStringAsFixed(0)} جنيه', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900)), const Spacer(), Text('إتمام الطلب', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900)), SizedBox(width: 6.w), const Icon(Icons.arrow_back_rounded)]),
     ))),
   );
 
