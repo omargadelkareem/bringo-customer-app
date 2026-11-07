@@ -10,49 +10,59 @@ class ProfileScreen extends StatelessWidget {
   ProfileScreen({super.key});
 
   final GetStorage box = GetStorage();
+  static const _dark = Color(0xFF153F3B);
+  static const _ink = Color(0xFF1B302D);
+  static const _muted = Color(0xFF81908C);
+  static const _canvas = Color(0xFFF6F8F6);
+  static const _lime = Color(0xFFDDFB8A);
+
+  void _open(BuildContext context, Widget page) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+  }
 
   @override
   Widget build(BuildContext context) {
     final accountName = box.read('accountName')?.toString().trim() ?? '';
     final legacyName = box.read('userName')?.toString().trim() ?? '';
-    final accountPhone = box.read('accountPhone')?.toString().trim() ?? '';
-    final name = accountName.isNotEmpty ? accountName : legacyName;
+    final phone = box.read('accountPhone')?.toString().trim() ?? '';
+    final name = accountName.isNotEmpty ? accountName : legacyName.isNotEmpty ? legacyName : 'عميل برينجو';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F9F8),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.only(bottom: 110.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: _canvas,
+        body: SafeArea(
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: EdgeInsets.only(bottom: 110.h),
             children: [
-              _topBar(),
-              SizedBox(height: 10.h),
-              _profileHeader(context, name.isEmpty ? 'عميل Bringo' : name, accountPhone),
-              SizedBox(height: 28.h),
-              _sectionLabel('الحساب'),
-              _menuGroup(context, items: const [
-                _ProfileItem(icon: Icons.person_outline_rounded, title: 'بياناتي الشخصية', page: PersonalInfoScreen()),
-                _ProfileItem(icon: Icons.location_on_outlined, title: 'عناويني', page: AddressesScreen()),
-              ]),
-              SizedBox(height: 26.h),
-              _sectionLabel('الطلبات والتوصيل'),
-              _menuGroup(context, items: const [
-                _ProfileItem(icon: Icons.receipt_long_outlined, title: 'طلباتي', page: MyOrdersScreen()),
-              ]),
-              SizedBox(height: 26.h),
-              _sectionLabel('المساعدة'),
-              _menuGroup(context, items: const [
-                _ProfileItem(icon: Icons.headset_mic_outlined, title: 'الدعم والمساعدة', page: SupportScreen()),
-                _ProfileItem(icon: Icons.privacy_tip_outlined, title: 'سياسة الخصوصية', page: PrivacyPolicyScreen()),
-                _ProfileItem(icon: Icons.description_outlined, title: 'الشروط والأحكام', page: TermsAndConditionsScreen()),
-                _ProfileItem(icon: Icons.info_outline_rounded, title: 'عن Bringo', page: AboutBringoScreen()),
-              ]),
-              SizedBox(height: 30.h),
-              _logout(context),
+              _hero(context, name, phone),
               SizedBox(height: 22.h),
-              Center(child: Text('Bringo  •  v1.0.0', style: TextStyle(color: const Color(0xFF98A3A3), fontSize: 10.5.sp, fontWeight: FontWeight.w600))),
+              _quickActions(context),
+              SizedBox(height: 28.h),
+              _sectionTitle('إدارة الحساب'),
+              _group(context, [
+                _ProfileItem(Icons.person_outline_rounded, 'المعلومات الشخصية', 'تعديل بيانات حسابك', const PersonalInfoScreen()),
+                _ProfileItem(Icons.location_on_outlined, 'عناويني', 'عناوين التوصيل المحفوظة', const AddressesScreen()),
+              ]),
+              SizedBox(height: 24.h),
+              _sectionTitle('طلباتي'),
+              _group(context, [
+                _ProfileItem(Icons.receipt_long_outlined, 'سجل الطلبات', 'تابع طلباتك السابقة والحالية', const MyOrdersScreen()),
+              ]),
+              SizedBox(height: 24.h),
+              _sectionTitle('المساعدة والمعلومات'),
+              _group(context, [
+                _ProfileItem(Icons.support_agent_rounded, 'مركز المساعدة', 'إحنا هنا علشان نساعدك', const SupportScreen()),
+                _ProfileItem(Icons.shield_outlined, 'سياسة الخصوصية', 'إزاي بنحافظ على بياناتك', const PrivacyPolicyScreen()),
+                _ProfileItem(Icons.article_outlined, 'الشروط والأحكام', 'تعرف على شروط استخدام برينجو', const TermsAndConditionsScreen()),
+                _ProfileItem(Icons.info_outline_rounded, 'عن برينجو', 'اعرف أكتر عن التطبيق', const AboutBringoScreen()),
+              ]),
+              SizedBox(height: 22.h),
+              _logoutTile(context),
+              SizedBox(height: 24.h),
+              Center(child: Text('Bringo  •  v1.0.0',
+                  style: TextStyle(fontSize: 10.sp, color: _muted, fontWeight: FontWeight.w600))),
             ],
           ),
         ),
@@ -60,102 +70,184 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _topBar() => Padding(
-    padding: EdgeInsets.fromLTRB(20.w, 18.h, 20.w, 8.h),
-    child: Align(alignment: Alignment.centerRight, child: Text('حسابي', style: TextStyle(color: const Color(0xFF172323), fontSize: 24.sp, fontWeight: FontWeight.w900))),
-  );
-
-  Widget _profileHeader(BuildContext context, String name, String phone) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.w),
-      child: Row(
-        textDirection: TextDirection.rtl,
-        children: [
-          Container(
-            width: 68.w,
-            height: 68.w,
-            decoration: BoxDecoration(color: const Color(0xFFE8F2F0), shape: BoxShape.circle, border: Border.all(color: AppColors.primary.withOpacity(.10))),
-            child: Icon(Icons.person_rounded, color: AppColors.primary, size: 34.sp),
-          ),
-          SizedBox(width: 14.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: const Color(0xFF172323), fontSize: 18.sp, fontWeight: FontWeight.w900)),
-                if (phone.isNotEmpty) ...[
-                  SizedBox(height: 4.h),
-                  Text(phone, textDirection: TextDirection.ltr, style: TextStyle(color: const Color(0xFF788383), fontSize: 12.sp, fontWeight: FontWeight.w600)),
-                ],
-                SizedBox(height: 8.h),
-                GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalInfoScreen())),
-                  child: Text('تعديل الحساب', style: TextStyle(color: AppColors.primary, fontSize: 11.5.sp, fontWeight: FontWeight.w800)),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionLabel(String title) => Padding(
-    padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 10.h),
-    child: Text(title, textAlign: TextAlign.right, style: TextStyle(color: const Color(0xFF7D8988), fontSize: 11.5.sp, fontWeight: FontWeight.w700)),
-  );
-
-  Widget _menuGroup(BuildContext context, {required List<_ProfileItem> items}) {
+  Widget _hero(BuildContext context, String name, String phone) {
     return Container(
-      color: Colors.white,
-      child: Column(
-        children: List.generate(items.length, (index) {
-          final item = items[index];
-          return Column(children: [
-            _menuItem(context, icon: item.icon, title: item.title, page: item.page),
-            if (index != items.length - 1)
-              Padding(padding: EdgeInsets.only(right: 68.w, left: 20.w), child: const Divider(height: 1, thickness: .7, color: Color(0xFFEDF0EF))),
-          ]);
-        }),
+      margin: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, 0),
+      decoration: BoxDecoration(
+        color: _dark,
+        borderRadius: BorderRadius.circular(26.r),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26.r),
+        child: Stack(children: [
+          Positioned(left: -38.w, top: -75.h, child: Container(
+            width: 185.w, height: 185.w,
+            decoration: BoxDecoration(shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withOpacity(.07), width: 34.w)),
+          )),
+          Positioned(left: 15.w, bottom: -75.h, child: Container(
+            width: 155.w, height: 155.w,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.035)),
+          )),
+          Padding(
+            padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 22.h),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text('حسابي', style: TextStyle(color: Colors.white, fontSize: 22.sp, fontWeight: FontWeight.w900)),
+                const Spacer(),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 6.h),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(.1),
+                      borderRadius: BorderRadius.circular(30.r)),
+                  child: Text('Bringo', style: TextStyle(color: _lime, fontSize: 12.sp, fontWeight: FontWeight.w900)),
+                ),
+              ]),
+              SizedBox(height: 27.h),
+              Row(children: [
+                Container(
+                  width: 66.w, height: 66.w,
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(.12),
+                    borderRadius: BorderRadius.circular(20.r),
+                    border: Border.all(color: Colors.white.withOpacity(.2))),
+                  child: Icon(Icons.person_rounded, size: 35.sp, color: _lime),
+                ),
+                SizedBox(width: 14.w),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('أهلاً بيك 👋', style: TextStyle(color: const Color(0xFFBFD4CD), fontSize: 11.sp)),
+                  SizedBox(height: 5.h),
+                  Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white, fontSize: 19.sp, fontWeight: FontWeight.w900)),
+                  if (phone.isNotEmpty) ...[
+                    SizedBox(height: 4.h),
+                    Text(phone, textDirection: TextDirection.ltr,
+                        style: TextStyle(color: const Color(0xFFCDDED7), fontSize: 11.sp)),
+                  ],
+                ])),
+              ]),
+              SizedBox(height: 22.h),
+              Material(
+                color: _lime,
+                borderRadius: BorderRadius.circular(13.r),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(13.r),
+                  onTap: () => _open(context, const PersonalInfoScreen()),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.edit_outlined, size: 17.sp, color: _dark),
+                      SizedBox(width: 8.w),
+                      Text('تعديل الملف الشخصي',
+                          style: TextStyle(fontSize: 12.sp, color: _dark, fontWeight: FontWeight.w900)),
+                    ]),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ]),
       ),
     );
   }
 
-  Widget _menuItem(BuildContext context, {required IconData icon, required String title, required Widget page}) {
-    return Material(
-      color: Colors.white,
-      child: InkWell(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => page)),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 17.h),
-          child: Row(textDirection: TextDirection.rtl, children: [
-            Icon(icon, color: AppColors.primary, size: 23.sp),
-            SizedBox(width: 15.w),
-            Expanded(child: Text(title, textAlign: TextAlign.right, style: TextStyle(color: const Color(0xFF263130), fontSize: 14.sp, fontWeight: FontWeight.w700))),
-            SizedBox(width: 10.w),
-            Icon(Icons.arrow_back_ios_new_rounded, color: const Color(0xFFB6BDBC), size: 14.sp),
-          ]),
-        ),
-      ),
-    );
-  }
+  Widget _quickActions(BuildContext context) => Padding(
+    padding: EdgeInsets.symmetric(horizontal: 16.w),
+    child: Row(children: [
+      Expanded(child: _shortcut(context, Icons.receipt_long_rounded, 'طلباتي', const MyOrdersScreen())),
+      SizedBox(width: 11.w),
+      Expanded(child: _shortcut(context, Icons.location_on_rounded, 'عناويني', const AddressesScreen())),
+      SizedBox(width: 11.w),
+      Expanded(child: _shortcut(context, Icons.headset_mic_rounded, 'المساعدة', const SupportScreen())),
+    ]),
+  );
 
-  Widget _logout(BuildContext context) {
-    return Material(
-      color: Colors.white,
+  Widget _shortcut(BuildContext context, IconData icon, String title, Widget page) => Material(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(18.r),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(18.r),
+      onTap: () => _open(context, page),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 18.h, horizontal: 5.w),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(18.r),
+          border: Border.all(color: const Color(0xFFE7EDE9))),
+        child: Column(children: [
+          Container(width: 44.w, height: 44.w,
+            decoration: BoxDecoration(color: const Color(0xFFECF5F0),
+              borderRadius: BorderRadius.circular(14.r)),
+            child: Icon(icon, color: AppColors.primary, size: 23.sp)),
+          SizedBox(height: 10.h),
+          Text(title, style: TextStyle(color: _ink, fontSize: 11.5.sp, fontWeight: FontWeight.w800)),
+        ]),
+      ),
+    ),
+  );
+
+  Widget _sectionTitle(String title) => Padding(
+    padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 12.h),
+    child: Text(title, style: TextStyle(fontSize: 14.sp, color: _ink, fontWeight: FontWeight.w900)),
+  );
+
+  Widget _group(BuildContext context, List<_ProfileItem> items) => Container(
+    margin: EdgeInsets.symmetric(horizontal: 16.w),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20.r),
+      border: Border.all(color: const Color(0xFFE8EEEA))),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(20.r),
+      child: Column(children: [
+        for (var i = 0; i < items.length; i++) ...[
+          _tile(context, items[i]),
+          if (i < items.length - 1)
+            Padding(padding: EdgeInsets.only(right: 66.w, left: 16.w),
+              child: const Divider(height: 1, color: Color(0xFFF0F2F0))),
+        ],
+      ]),
+    ),
+  );
+
+  Widget _tile(BuildContext context, _ProfileItem item) => Material(
+    color: Colors.white,
+    child: InkWell(
+      onTap: () => _open(context, item.page),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 13.h),
+        child: Row(children: [
+          Container(width: 43.w, height: 43.w,
+            decoration: BoxDecoration(color: const Color(0xFFF0F6F2),
+              borderRadius: BorderRadius.circular(13.r)),
+            child: Icon(item.icon, color: AppColors.primary, size: 22.sp)),
+          SizedBox(width: 12.w),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(item.title, style: TextStyle(color: _ink, fontSize: 12.5.sp, fontWeight: FontWeight.w800)),
+            SizedBox(height: 3.h),
+            Text(item.subtitle, style: TextStyle(color: _muted, fontSize: 10.sp)),
+          ])),
+          Icon(Icons.chevron_left_rounded, color: const Color(0xFF9DABA5), size: 23.sp),
+        ]),
+      ),
+    ),
+  );
+
+  Widget _logoutTile(BuildContext context) => Padding(
+    padding: EdgeInsets.symmetric(horizontal: 16.w),
+    child: Material(
+      color: const Color(0xFFFFF3F1),
+      borderRadius: BorderRadius.circular(17.r),
       child: InkWell(
+        borderRadius: BorderRadius.circular(17.r),
         onTap: () => _confirmLogout(context),
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 18.h),
-          child: Row(textDirection: TextDirection.rtl, children: [
-            Icon(Icons.logout_rounded, color: const Color(0xFFD94A4A), size: 22.sp),
-            SizedBox(width: 15.w),
-            Expanded(child: Text('تسجيل الخروج', textAlign: TextAlign.right, style: TextStyle(color: const Color(0xFFD94A4A), fontSize: 14.sp, fontWeight: FontWeight.w800))),
+          padding: EdgeInsets.symmetric(horizontal: 17.w, vertical: 16.h),
+          child: Row(children: [
+            Icon(Icons.logout_rounded, color: const Color(0xFFC34E45), size: 22.sp),
+            SizedBox(width: 12.w),
+            Expanded(child: Text('تسجيل الخروج',
+              style: TextStyle(color: const Color(0xFFC34E45), fontSize: 13.sp, fontWeight: FontWeight.w900))),
+            Icon(Icons.chevron_left_rounded, color: const Color(0xFFC34E45)),
           ]),
         ),
       ),
-    );
-  }
+    ),
+  );
 
   Future<void> _confirmLogout(BuildContext context) async {
     final confirm = await showModalBottomSheet<bool>(
@@ -197,7 +289,7 @@ class ProfileScreen extends StatelessWidget {
 class _ProfileItem {
   final IconData icon;
   final String title;
+  final String subtitle;
   final Widget page;
-
-  const _ProfileItem({required this.icon, required this.title, required this.page});
+  const _ProfileItem(this.icon, this.title, this.subtitle, this.page);
 }
