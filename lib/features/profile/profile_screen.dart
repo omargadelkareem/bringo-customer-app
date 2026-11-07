@@ -10,11 +10,9 @@ class ProfileScreen extends StatelessWidget {
   ProfileScreen({super.key});
 
   final GetStorage box = GetStorage();
-  static const _dark = Color(0xFF153F3B);
   static const _ink = Color(0xFF1B302D);
   static const _muted = Color(0xFF81908C);
   static const _canvas = Color(0xFFF6F8F6);
-  static const _lime = Color(0xFFDDFB8A);
 
   void _open(BuildContext context, Widget page) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
@@ -37,8 +35,6 @@ class ProfileScreen extends StatelessWidget {
             padding: EdgeInsets.only(bottom: 110.h),
             children: [
               _hero(context, name, phone),
-              SizedBox(height: 22.h),
-              _quickActions(context),
               SizedBox(height: 28.h),
               _sectionTitle('إدارة الحساب'),
               _group(context, [
@@ -71,116 +67,68 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _hero(BuildContext context, String name, String phone) {
-    return Container(
-      margin: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, 0),
-      decoration: BoxDecoration(
-        color: _dark,
-        borderRadius: BorderRadius.circular(26.r),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(26.r),
-        child: Stack(children: [
-          Positioned(left: -38.w, top: -75.h, child: Container(
-            width: 185.w, height: 185.w,
-            decoration: BoxDecoration(shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(.07), width: 34.w)),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('حسابي', style: TextStyle(
+            color: _ink, fontSize: 25.sp, fontWeight: FontWeight.w900,
           )),
-          Positioned(left: 15.w, bottom: -75.h, child: Container(
-            width: 155.w, height: 155.w,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(.035)),
-          )),
-          Padding(
-            padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 22.h),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Text('حسابي', style: TextStyle(color: Colors.white, fontSize: 22.sp, fontWeight: FontWeight.w900)),
-                const Spacer(),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 6.h),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(.1),
-                      borderRadius: BorderRadius.circular(30.r)),
-                  child: Text('Bringo', style: TextStyle(color: _lime, fontSize: 12.sp, fontWeight: FontWeight.w900)),
+          SizedBox(height: 22.h),
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20.r),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20.r),
+              onTap: () => _open(context, const PersonalInfoScreen()),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 18.h),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20.r),
+                  border: Border.all(color: const Color(0xFFE8EEEA)),
                 ),
-              ]),
-              SizedBox(height: 27.h),
-              Row(children: [
-                Container(
-                  width: 66.w, height: 66.w,
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(.12),
-                    borderRadius: BorderRadius.circular(20.r),
-                    border: Border.all(color: Colors.white.withOpacity(.2))),
-                  child: Icon(Icons.person_rounded, size: 35.sp, color: _lime),
-                ),
-                SizedBox(width: 14.w),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('أهلاً بيك 👋', style: TextStyle(color: const Color(0xFFBFD4CD), fontSize: 11.sp)),
-                  SizedBox(height: 5.h),
-                  Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white, fontSize: 19.sp, fontWeight: FontWeight.w900)),
-                  if (phone.isNotEmpty) ...[
-                    SizedBox(height: 4.h),
-                    Text(phone, textDirection: TextDirection.ltr,
-                        style: TextStyle(color: const Color(0xFFCDDED7), fontSize: 11.sp)),
-                  ],
-                ])),
-              ]),
-              SizedBox(height: 22.h),
-              Material(
-                color: _lime,
-                borderRadius: BorderRadius.circular(13.r),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(13.r),
-                  onTap: () => _open(context, const PersonalInfoScreen()),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
-                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(Icons.edit_outlined, size: 17.sp, color: _dark),
-                      SizedBox(width: 8.w),
-                      Text('تعديل الملف الشخصي',
-                          style: TextStyle(fontSize: 12.sp, color: _dark, fontWeight: FontWeight.w900)),
-                    ]),
+                child: Row(children: [
+                  Container(
+                    width: 58.w, height: 58.w,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEAF4EF),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFD7E9DF)),
+                    ),
+                    child: Icon(Icons.person_rounded,
+                      color: AppColors.primary, size: 30.sp),
                   ),
-                ),
+                  SizedBox(width: 13.w),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: _ink, fontSize: 17.sp,
+                          fontWeight: FontWeight.w900)),
+                      if (phone.isNotEmpty) ...[
+                        SizedBox(height: 5.h),
+                        Text(phone, textDirection: TextDirection.ltr,
+                          style: TextStyle(color: _muted, fontSize: 11.5.sp)),
+                      ],
+                      SizedBox(height: 7.h),
+                      Text('عرض وتعديل بيانات الحساب',
+                        style: TextStyle(color: AppColors.primary,
+                          fontSize: 11.sp, fontWeight: FontWeight.w800)),
+                    ],
+                  )),
+                  SizedBox(width: 8.w),
+                  Icon(Icons.chevron_left_rounded,
+                    color: const Color(0xFF9DABA5), size: 23.sp),
+                ]),
               ),
-            ]),
+            ),
           ),
-        ]),
+        ],
       ),
     );
   }
-
-  Widget _quickActions(BuildContext context) => Padding(
-    padding: EdgeInsets.symmetric(horizontal: 16.w),
-    child: Row(children: [
-      Expanded(child: _shortcut(context, Icons.receipt_long_rounded, 'طلباتي', const MyOrdersScreen())),
-      SizedBox(width: 11.w),
-      Expanded(child: _shortcut(context, Icons.location_on_rounded, 'عناويني', const AddressesScreen())),
-      SizedBox(width: 11.w),
-      Expanded(child: _shortcut(context, Icons.headset_mic_rounded, 'المساعدة', const SupportScreen())),
-    ]),
-  );
-
-  Widget _shortcut(BuildContext context, IconData icon, String title, Widget page) => Material(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(18.r),
-    child: InkWell(
-      borderRadius: BorderRadius.circular(18.r),
-      onTap: () => _open(context, page),
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 18.h, horizontal: 5.w),
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(18.r),
-          border: Border.all(color: const Color(0xFFE7EDE9))),
-        child: Column(children: [
-          Container(width: 44.w, height: 44.w,
-            decoration: BoxDecoration(color: const Color(0xFFECF5F0),
-              borderRadius: BorderRadius.circular(14.r)),
-            child: Icon(icon, color: AppColors.primary, size: 23.sp)),
-          SizedBox(height: 10.h),
-          Text(title, style: TextStyle(color: _ink, fontSize: 11.5.sp, fontWeight: FontWeight.w800)),
-        ]),
-      ),
-    ),
-  );
 
   Widget _sectionTitle(String title) => Padding(
     padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 12.h),
