@@ -1,4 +1,5 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bringo/core/routing/app_routes.dart';
@@ -110,6 +111,59 @@ class OrderTrackingScreen extends StatelessWidget {
     }
   }
 
+  bool _canCancel(Map<String, dynamic> order) {
+    final rawStatus = _first([order['status'], order['orderStatus']])
+        .toLowerCase().replaceAll('_', '').replaceAll('-', '');
+    return const {'pending', 'pendingprovider', 'new'}.contains(rawStatus);
+  }
+
+  Future<void> _cancelOrder(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('إلغاء الطلب'),
+        content: const Text('هل أنت متأكد من إلغاء الطلب؟ يمكنك الإلغاء فقط قبل قبول المتجر.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('رجوع')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('تأكيد الإلغاء', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final box = GetStorage();
+    final userId = _first([box.read('userId'), box.read('uid'), box.read('id')]);
+    if (userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('يرجى تسجيل الدخول لإلغاء الطلب')));
+      return;
+    }
+    try {
+      final result = await FirebaseDatabase.instance.ref('orders/$orderId').runTransaction((current) {
+        if (current is! Map) return Transaction.abort();
+        final order = Map<String, dynamic>.from(current);
+        if (order['userId']?.toString() != userId || !_canCancel(order)) {
+          return Transaction.abort();
+        }
+        order['status'] = 'cancelled';
+        order['orderStatus'] = 'cancelled';
+        order['cancelledBy'] = 'customer';
+        order['cancelledAt'] = ServerValue.timestamp;
+        order['updatedAt'] = ServerValue.timestamp;
+        return Transaction.success(order);
+      }, applyLocally: false);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        result.committed ? 'تم إلغاء الطلب بنجاح' : 'لا يمكن إلغاء الطلب بعد قبول المتجر',
+      )));
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر إلغاء الطلب، حاول مرة أخرى')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: false,
@@ -161,6 +215,16 @@ class OrderTrackingScreen extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(17.w, 8.h, 17.w, 40.h),
             children: [
               _hero(status, _money(order['total'])),
+              if (_canCancel(order) && order['userId']?.toString() ==
+                  _first([GetStorage().read('userId'), GetStorage().read('uid'), GetStorage().read('id')])) ...[
+                SizedBox(height: 12.h),
+                OutlinedButton.icon(
+                  onPressed: () => _cancelOrder(context),
+                  icon: const Icon(Icons.cancel_outlined),
+                  label: const Text('إلغاء الطلب قبل قبول المتجر'),
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                ),
+              ],
               SizedBox(height: 20.h),
               _timeline(status),
               if (name.isNotEmpty) ...[
