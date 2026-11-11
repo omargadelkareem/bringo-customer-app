@@ -82,6 +82,36 @@ class _SupermarketStoreDetailsScreenState
     return products;
   }
 
+  bool get _isAbuHalimaPreview {
+    final normalized = _normalize(storeName).replaceAll(' ', '');
+    return normalized.contains('ابوحليمه') ||
+        normalized.contains('ابوحليمة');
+  }
+
+  List<Map<String, dynamic>> _approvedPreviewProducts(dynamic catalog) {
+    if (!_isAbuHalimaPreview || catalog is! Map) return [];
+    final preview = <Map<String, dynamic>>[];
+    for (final entry in catalog.entries) {
+      final value = entry.value;
+      if (value is! Map || value['imageStatus'] != 'approved') continue;
+      final image = value['imageUrl']?.toString().trim() ?? '';
+      final name = (value['nameAr'] ?? value['name'])?.toString().trim() ?? '';
+      if (!image.startsWith('https://') || name.isEmpty) continue;
+      preview.add({
+        'id': 'preview_${entry.key}',
+        'name': name,
+        'brand': value['brand']?.toString() ?? '',
+        'category': value['category']?.toString() ?? '',
+        'image': image,
+        'catalogProductId': entry.key.toString(),
+        'previewOnly': true,
+        'isAvailable': false,
+      });
+      if (preview.length >= 100) break;
+    }
+    return preview;
+  }
+
   static const List<_StoreCategoryDefinition> _fixedCategories = [
     _StoreCategoryDefinition(
       id: 'grocery',
@@ -272,6 +302,12 @@ class _SupermarketStoreDetailsScreenState
         backgroundColor: const Color(0xFFFFFBFD),
         body: StreamBuilder<DatabaseEvent>(
           stream: FirebaseDatabase.instance
+              .ref('catalogProducts')
+              .onValue,
+          builder: (context, catalogSnapshot) {
+            final catalog = catalogSnapshot.data?.snapshot.value;
+            return StreamBuilder<DatabaseEvent>(
+          stream: FirebaseDatabase.instance
               .ref('products')
               .orderByChild('storeId')
               .equalTo(storeId)
@@ -281,11 +317,37 @@ class _SupermarketStoreDetailsScreenState
                 snapshot.connectionState == ConnectionState.waiting &&
                     !snapshot.hasData;
 
-            final allProducts = _parseProducts(
+            final rawProducts = _parseProducts(
               snapshot.data?.snapshot.value,
             );
+            // Keep the merchant's price, stock and availability unchanged.
+            // Only use an approved catalog photo when the merchant has no image
+            // and the product explicitly references that catalog entry.
+            final catalogMap = catalog is Map ? catalog : const {};
+            final allProducts = rawProducts.map((product) {
+              final currentImage = product['image']?.toString().trim() ?? '';
+              final catalogId = product['catalogProductId']?.toString().trim() ?? '';
+              if (currentImage.isNotEmpty || catalogId.isEmpty) return product;
+              final entry = catalogMap[catalogId];
+              if (entry is! Map || entry['imageStatus'] != 'approved') {
+                return product;
+              }
+              final url = entry['imageUrl']?.toString().trim() ?? '';
+              if (!url.startsWith('https://')) return product;
+              return {...product, 'image': url};
+            }).toList();
 
-            final categories = _buildCategories(allProducts);
+            // For Abu Halima only: show approved catalog items as a
+            // read-only preview when the store has no products yet.
+            // Never create purchasable products or invent prices.
+            final showingPreview = allProducts.isEmpty &&
+                _isAbuHalimaPreview &&
+                !loading &&
+                !snapshot.hasError;
+            final displayProducts = showingPreview
+                ? _approvedPreviewProducts(catalog)
+                : allProducts;
+            final categories = _buildCategories(displayProducts);
 
             if (!categories.any(
               (category) => category.id == selectedCategory,
@@ -293,7 +355,7 @@ class _SupermarketStoreDetailsScreenState
               selectedCategory = 'all';
             }
 
-            final products = _filterProducts(allProducts);
+            final products = _filterProducts(displayProducts);
 
             return CustomScrollView(
               physics: const BouncingScrollPhysics(),
@@ -360,7 +422,9 @@ class _SupermarketStoreDetailsScreenState
 
                           return _StoreProductCard(
                             product: product,
-                            onTap: () => _openProduct(product),
+                            onTap: product['previewOnly'] == true
+                                ? () {}
+                                : () => _openProduct(product),
                           );
                         },
                         childCount: products.length,
@@ -376,6 +440,8 @@ class _SupermarketStoreDetailsScreenState
                   ),
               ],
             );
+          },
+        );
           },
         ),
       ),
@@ -887,8 +953,9 @@ class _StoreProductCard extends StatelessWidget {
         ) ??
         0;
 
+    final previewOnly = product['previewOnly'] == true;
     final hasDiscount =
-        oldPrice > price && oldPrice > 0 && price > 0;
+        !previewOnly && oldPrice > price && oldPrice > 0 && price > 0;
 
     return InkWell(
       onTap: onTap,
@@ -980,7 +1047,7 @@ class _StoreProductCard extends StatelessWidget {
             SizedBox(height: 8.h),
             Row(
               children: [
-                Container(
+                if (!previewOnly) Container(
                   width: 36.w,
                   height: 36.w,
                   decoration: const BoxDecoration(
@@ -998,7 +1065,7 @@ class _StoreProductCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${price.toStringAsFixed(0)} جنيه',
+                      previewOnly ? 'للعرض فقط' : '${price.toStringAsFixed(0)} جنيه',
                       style: TextStyle(
                         color: AppColors.primary,
                         fontSize: 14.sp,
