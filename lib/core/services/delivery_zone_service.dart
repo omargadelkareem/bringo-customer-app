@@ -38,8 +38,25 @@ class DeliveryZoneQuote {
 
 class DeliveryZoneService {
   DeliveryZoneService._();
-  static const double pricePerKm = 11;
-  static const double minimumFee = 25;
+  static const double defaultPricePerKm = 10;
+  static const double defaultMinimumFee = 25;
+
+  // Public, admin-managed pricing. Orders retain the quoted values at checkout.
+  static Future<(double, double)> _pricing() async {
+    try {
+      final snapshot = await FirebaseDatabase.instance.ref('config/deliveryPricing').get();
+      final config = _map(snapshot.value);
+      final perKm = _number(config['pricePerKm']);
+      final minimum = _number(config['minimumFee']);
+      return (
+        perKm != null && perKm.isFinite && perKm > 0 ? perKm : defaultPricePerKm,
+        minimum != null && minimum.isFinite && minimum >= 0 ? minimum : defaultMinimumFee,
+      );
+    } catch (_) {
+      // Keep checkout usable if the optional configuration is not yet deployed.
+      return (defaultPricePerKm, defaultMinimumFee);
+    }
+  }
   static const zones = <DeliveryZone>[
     DeliveryZone(id: 'sohag_east', name: 'شرق سوهاج'),
     DeliveryZone(id: 'sohag_west', name: 'غرب سوهاج'),
@@ -134,6 +151,7 @@ class DeliveryZoneService {
       storeLat: storeLat, storeLng: storeLng,
       customerLat: latitude, customerLng: longitude,
     );
+    final (pricePerKm, minimumFee) = await _pricing();
     final fee = math.max(minimumFee, (distance * pricePerKm).ceilToDouble());
     return DeliveryZoneQuote(
       storeZoneId: '', customerZoneId: '',
