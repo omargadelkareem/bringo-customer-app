@@ -316,7 +316,7 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _summary(double subtotal) => Container(
     padding: EdgeInsets.all(16.w), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16.r), border: Border.all(color: AppColors.border)),
-    child: Column(children: [_row('إجمالي المنتجات', subtotal), SizedBox(height: 11.h), _row('رسوم التوصيل', deliveryFee, deliveryRow: true), if (deliveryQuote != null) Padding(padding: EdgeInsets.only(top: 6.h), child: Text('مسافة الطريق المحسوبة: ${deliveryQuote!.distanceKm.toStringAsFixed(2)} كم × ${deliveryQuote!.pricePerKm.toStringAsFixed(0)} جنيه/كم • الحد الأدنى ${deliveryQuote!.minimumFee.toStringAsFixed(0)} جنيه', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.sp, color: AppColors.dark.withOpacity(0.7)))), Padding(padding: EdgeInsets.symmetric(vertical: 13.h), child: const Divider(height: 1)), _row('الإجمالي', subtotal + deliveryFee, bold: true)]),
+    child: Column(children: [_row('إجمالي المنتجات', subtotal), SizedBox(height: 11.h), _row('رسوم التوصيل', deliveryFee, deliveryRow: true), if (deliveryQuote != null) Padding(padding: EdgeInsets.only(top: 6.h), child: Text('المسافة من ${CartManager.storeName.trim().isEmpty ? 'المتجر' : CartManager.storeName.trim()} إلى عنوانك: حوالي ${deliveryQuote!.distanceKm.toStringAsFixed(1)} كم', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.sp, color: AppColors.dark.withOpacity(0.7)))), Padding(padding: EdgeInsets.symmetric(vertical: 13.h), child: const Divider(height: 1)), _row('الإجمالي', subtotal + deliveryFee, bold: true)]),
   );
 
   Widget _row(String title, double value, {bool bold = false, bool deliveryRow = false}) => Row(children: [
